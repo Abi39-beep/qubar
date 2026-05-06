@@ -32,14 +32,13 @@ Rectangle {
         cursorShape: Qt.PointingHandCursor
         onClicked: {
             dashPopup.visible = !dashPopup.visible;
-            if (dashPopup.visible && dashWidget.showClipboard) {
+            if (dashPopup.visible && dashWidget.activeTab === 1) {
                 refreshClip.running = false;
                 resetTimer.start();
             }
         }
     }
 
-    // Utility Format Function for Media Timers
     function formatTime(seconds) {
         if (isNaN(seconds) || seconds < 0) return "0:00";
         let m = Math.floor(seconds / 60);
@@ -47,9 +46,6 @@ Rectangle {
         return m + ":" + (s < 10 ? "0" : "") + s;
     }
 
-    // ==========================================
-    // 0. GLOBAL SHORTCUT (POWER MENU)
-    // ==========================================
     GlobalShortcut {
         name: "powermenu" 
         onPressed: {
@@ -63,13 +59,149 @@ Rectangle {
         }
     }
 
+    property int activeTab: 0 
+
     // ==========================================
-    // 1. DATA & LOGIC 
+    // EXTERNAL TEMPLATES LOGIC (GTK & ZED)
     // ==========================================
-    property bool showClipboard: false
+    property bool gtkEnabled: false
+    property bool zedEnabled: false
+
+    Process {
+        id: checkFlags
+        command:["bash", "-c", "[[ -f ~/.cache/qs_gtk_enabled ]] && echo 'gtk'; [[ -f ~/.cache/qs_zed_enabled ]] && echo 'zed'"]
+        running: true
+        stdout: SplitParser {
+            onRead: data => {
+                if (data === "gtk") dashWidget.gtkEnabled = true;
+                if (data === "zed") dashWidget.zedEnabled = true;
+            }
+        }
+    }
+
+    Timer {
+        id: applyTimer
+        interval: 1000 
+        running: true
+        onTriggered: {
+            if (dashWidget.gtkEnabled) dashWidget.applyGtk();
+            if (dashWidget.zedEnabled) dashWidget.applyZed();
+        }
+    }
+
+    function applyGtk() {
+        let css = `
+@define-color accent_color ${Colors.blue};
+@define-color accent_bg_color ${Colors.blue};
+@define-color window_bg_color ${Colors.bg0};
+@define-color window_fg_color ${Colors.fg};
+@define-color view_bg_color ${Colors.bg0};
+@define-color view_fg_color ${Colors.fg};
+@define-color headerbar_bg_color ${Colors.bg1};
+@define-color headerbar_fg_color ${Colors.fg};
+@define-color popover_bg_color ${Colors.bg2};
+@define-color popover_fg_color ${Colors.fg};
+@define-color card_bg_color ${Colors.bg1};
+@define-color card_fg_color ${Colors.fg};
+@define-color dialog_bg_color ${Colors.bg0};
+@define-color dialog_fg_color ${Colors.fg};
+`;
+        let cmd = `mkdir -p ~/.config/gtk-3.0 ~/.config/gtk-4.0 && echo "${css}" > ~/.config/gtk-3.0/gtk.css && echo "${css}" > ~/.config/gtk-4.0/gtk.css && touch ~/.cache/qs_gtk_enabled`;
+        Quickshell.execDetached(["bash", "-c", cmd]);
+
+        let reloadCmd = `
+        gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+        if pacman -Qs adw-gtk3 > /dev/null; then
+            gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark'
+        else
+            gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark'
+        fi
+        `;
+        Quickshell.execDetached(["bash", "-c", reloadCmd]);
+    }
+
+    function removeGtk() {
+        Quickshell.execDetached(["bash", "-c", "rm -f ~/.config/gtk-3.0/gtk.css ~/.config/gtk-4.0/gtk.css ~/.cache/qs_gtk_enabled"]);
+    }
+
+    function applyZed() {
+        let zedJson = `{
+  "name": "Quickshell Sync",
+  "author": "Auto Generated",
+  "themes":[
+    {
+      "name": "Quickshell Sync",
+      "appearance": "dark",
+      "style": {
+        "background": "${Colors.bg0}",
+        "foreground": "${Colors.fg}",
+        "text": "${Colors.fg}",
+        "text.muted": "${Colors.grey1}",
+        "text.accent": "${Colors.blue}",
+        "border": "${Colors.bg2}",
+        "border.focused": "${Colors.blue}",
+        "element.background": "${Colors.bg1}",
+        "element.hover": "${Colors.bg2}",
+        "element.active": "${Colors.bg3}",
+        "element.selected": "${Colors.bg2}",
+        "title_bar.background": "${Colors.bg0}",
+        "status_bar.background": "${Colors.bg0}",
+        "tab_bar.background": "${Colors.bg1}",
+        "tab.inactive_background": "${Colors.bg1}",
+        "tab.active_background": "${Colors.bg0}",
+        "panel.background": "${Colors.bg0}",
+        "editor.background": "${Colors.bg0}",
+        "editor.foreground": "${Colors.fg}",
+        "editor.line_number": "${Colors.grey0}",
+        "editor.active_line_number": "${Colors.fg}",
+        "editor.active_line.background": "${Colors.bg1}",
+        "editor.gutter.background": "${Colors.bg0}",
+        "terminal.background": "${Colors.bg0}",
+        "terminal.foreground": "${Colors.fg}",
+        "terminal.ansi.black": "${Colors.bg1}",
+        "terminal.ansi.red": "${Colors.red}",
+        "terminal.ansi.green": "${Colors.green}",
+        "terminal.ansi.yellow": "${Colors.yellow}",
+        "terminal.ansi.blue": "${Colors.blue}",
+        "terminal.ansi.magenta": "${Colors.magenta}",
+        "terminal.ansi.cyan": "${Colors.cyan}",
+        "terminal.ansi.white": "${Colors.fg}",
+        "syntax": {
+          "keyword": { "color": "${Colors.magenta}" },
+          "control": { "color": "${Colors.magenta}" },
+          "boolean": { "color": "${Colors.orange}" },
+          "function": { "color": "${Colors.blue}" },
+          "string": { "color": "${Colors.green}" },
+          "number": { "color": "${Colors.orange}" },
+          "property": { "color": "${Colors.cyan}" },
+          "attribute": { "color": "${Colors.cyan}" },
+          "type": { "color": "${Colors.yellow}" },
+          "constructor": { "color": "${Colors.yellow}" },
+          "comment": { "color": "${Colors.grey1}", "font_style": "italic" },
+          "variable": { "color": "${Colors.fg}" },
+          "constant": { "color": "${Colors.orange}" },
+          "punctuation": { "color": "${Colors.grey0}" },
+          "operator": { "color": "${Colors.cyan}" },
+          "tag": { "color": "${Colors.red}" }
+        }
+      }
+    }
+  ]
+}`;
+        let cmd1 = `mkdir -p ~/.config/zed/themes && cat << 'EOF' > ~/.config/zed/themes/quickshell-sync.json\n${zedJson}\nEOF\ntouch ~/.cache/qs_zed_enabled`;
+        Quickshell.execDetached(["bash", "-c", cmd1]);
+        
+        let cmd2 = `sed -i 's/"theme":.*/"theme": "Quickshell Sync",/' ~/.config/zed/settings.json || sed -i '1s/{/{\\n  "theme": "Quickshell Sync",/' ~/.config/zed/settings.json`;
+        Quickshell.execDetached(["bash", "-c", cmd2]);
+    }
+
+    function removeZed() {
+        Quickshell.execDetached(["bash", "-c", "rm -f ~/.cache/qs_zed_enabled"]);
+    }
+    // ==========================================
 
     // Audio
-    PwObjectTracker { objects: Pipewire.defaultAudioSink ? [Pipewire.defaultAudioSink] :[] }
+    PwObjectTracker { objects: Pipewire.defaultAudioSink ?[Pipewire.defaultAudioSink] :[] }
     property var audio: Pipewire.defaultAudioSink?.audio
     property int volPercent: audio ? Math.round(audio.volume * 100) : 0
     property bool isMuted: audio ? audio.muted : false
@@ -83,7 +215,7 @@ Rectangle {
     }
     Process {
         id: getBri
-        command: ["brightnessctl", "-m"]
+        command:["brightnessctl", "-m"]
         stdout: SplitParser {
             onRead: data => {
                 let parts = data.split(",");
@@ -92,7 +224,7 @@ Rectangle {
         }
     }
 
-    // --- SYSTEM STATS (CPU & MEMORY) ---
+    // --- SYSTEM STATS ---
     property string cpuUsage: "0.0%"
     property string memUsage: "0 MB"
 
@@ -176,7 +308,6 @@ Rectangle {
         }
     }
 
-    // Power Execution
     Process { id: executor; property string currentCommand: ""; command:["bash", "-c", currentCommand] }
     property var actionModel:[
         { name: "Lock", icon: "", cmd: "$HOME/.config/hypr/hyprlock.sh", color: Colors.blue },
@@ -186,7 +317,6 @@ Rectangle {
         { name: "Power", icon: "", cmd: "systemctl poweroff", color: Colors.red }
     ]
 
-    // Clipboard
     Timer {
         id: resetTimer
         interval: 10
@@ -221,7 +351,6 @@ Rectangle {
         }
     }
 
-    // Notifications
     NotificationServer {
         id: server
         onNotification: (notification) => { notification.tracked = true; }
@@ -310,10 +439,8 @@ Rectangle {
             id: bgRect
             anchors.top: parent.top; anchors.right: parent.right
             anchors.topMargin: 45; anchors.rightMargin: 15    
-            width: 380; height: 790 
-            
+            width: 380; height: 810 
             color: Qt.alpha(Colors.bg0, 0.95); border.color: Colors.bg2; border.width: 1; radius: 16
-            
             focus: true
             Keys.onEscapePressed: dashPopup.visible = false
             MouseArea { anchors.fill: parent }
@@ -362,7 +489,6 @@ Rectangle {
                         id: mediaBaseRect
                         anchors.fill: parent; radius: 12; color: Colors.bg1; border.width: 1; border.color: Colors.bg2
                         
-                        // FIX: Added layer.enabled: true so the effect can read them even though they are invisible!
                         Image {
                             id: artImage
                             anchors.fill: parent; anchors.margins: 1
@@ -621,24 +747,54 @@ Rectangle {
 
                 Rectangle { width: parent.width; height: 1; color: Colors.bg2 }
 
-                // --- TAB SELECTOR ---
-                // FIX: Used explicit anchors.verticalCenter inside the rows to perfectly level the icons and text
+                // ==========================================
+                // 5. EXTERNAL TEMPLATES BUTTON 
+                // ==========================================
+                Rectangle {
+                    id: themerBtn
+                    width: parent.width; height: 40; radius: 8
+                    color: themerBtnMouse.containsMouse || themerWindow.visible ? Colors.bg2 : Colors.bg1
+                    border.width: 1; border.color: Colors.bg2
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    
+                    Row {
+                        anchors.centerIn: parent; spacing: 10
+                        Text { text: "󰏘"; color: Colors.blue; font.pixelSize: 16; font.family: "JetBrainsMono Nerd Font"; anchors.verticalCenter: parent.verticalCenter }
+                        Text { text: "External App Templates"; color: Colors.fg; font.bold: true; font.pixelSize: 13; anchors.verticalCenter: parent.verticalCenter }
+                    }
+                    
+                    MouseArea {
+                        id: themerBtnMouse
+                        anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            dashPopup.visible = false;
+                            themerWindow.visible = true;
+                            themerBg.forceActiveFocus();
+                        }
+                    }
+                }
+
+                Rectangle { width: parent.width; height: 1; color: Colors.bg2 }
+
+                // --- 6. TAB SELECTOR ---
                 Row {
                     width: parent.width; height: 30; spacing: 10
+                    
                     Rectangle {
                         width: (parent.width - 10) / 2; height: 30; radius: 6
-                        color: !dashWidget.showClipboard ? Colors.bg2 : "transparent"
+                        color: dashWidget.activeTab === 0 ? Colors.bg2 : "transparent"
                         Behavior on color { ColorAnimation { duration: 200 } }
                         Row { 
                             anchors.centerIn: parent; spacing: 6
                             Text { text: "󰂚"; color: Colors.fg; font.pixelSize: 14; font.family: "JetBrainsMono Nerd Font"; anchors.verticalCenter: parent.verticalCenter }
                             Text { text: "Notifications"; color: Colors.fg; font.bold: true; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
                         }
-                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: dashWidget.showClipboard = false }
+                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: dashWidget.activeTab = 0 }
                     }
+                    
                     Rectangle {
                         width: (parent.width - 10) / 2; height: 30; radius: 6
-                        color: dashWidget.showClipboard ? Colors.bg2 : "transparent"
+                        color: dashWidget.activeTab === 1 ? Colors.bg2 : "transparent"
                         Behavior on color { ColorAnimation { duration: 200 } }
                         Row { 
                             anchors.centerIn: parent; spacing: 6
@@ -647,27 +803,23 @@ Rectangle {
                         }
                         MouseArea { 
                             anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                            onClicked: { 
-                                dashWidget.showClipboard = true;
-                                refreshClip.running = false;
-                                resetTimer.start();
-                            } 
+                            onClicked: { dashWidget.activeTab = 1; refreshClip.running = false; resetTimer.start(); } 
                         }
                     }
                 }
 
-                // --- LIST CONTENT AREA ---
+                // --- 7. LIST CONTENT AREA ---
                 Item {
                     width: parent.width; height: parent.height - y
                     
+                    // NOTIFICATIONS VIEW
                     Item {
-                        anchors.fill: parent; visible: !dashWidget.showClipboard
+                        anchors.fill: parent; visible: dashWidget.activeTab === 0
                         Rectangle {
                             width: 70; height: 24; radius: 4; color: Colors.red
                             anchors.top: parent.top; anchors.right: parent.right; z: 2 
                             scale: clearNotifMouse.pressed ? 0.9 : 1.0
                             Behavior on scale { NumberAnimation { duration: 100 } }
-                            // FIX: Separated the Clear icon and text so they align flawlessly
                             Row {
                                 anchors.centerIn: parent; spacing: 4
                                 Text { text: "󰆴"; color: Colors.bg0; font.pixelSize: 12; font.family: "JetBrainsMono Nerd Font"; anchors.verticalCenter: parent.verticalCenter }
@@ -693,14 +845,14 @@ Rectangle {
                         Text { anchors.centerIn: parent; text: "No new notifications"; color: Colors.grey0; font.pixelSize: 12; visible: notifList.count === 0 }
                     }
 
+                    // CLIPBOARD VIEW
                     Item {
-                        anchors.fill: parent; visible: dashWidget.showClipboard
+                        anchors.fill: parent; visible: dashWidget.activeTab === 1
                         Rectangle {
                             width: 70; height: 24; radius: 4; color: Colors.red
                             anchors.top: parent.top; anchors.right: parent.right; z: 2
                             scale: clearClipMouse.pressed ? 0.9 : 1.0
                             Behavior on scale { NumberAnimation { duration: 100 } }
-                            // FIX: Separated the Clear icon and text so they align flawlessly
                             Row {
                                 anchors.centerIn: parent; spacing: 4
                                 Text { text: "󰆴"; color: Colors.bg0; font.pixelSize: 12; font.family: "JetBrainsMono Nerd Font"; anchors.verticalCenter: parent.verticalCenter }
@@ -738,10 +890,7 @@ Rectangle {
                                         width: 26; height: 26; radius: 4; color: model.justCopied ? "transparent" : (copyMouse.containsMouse ? Colors.blue : Colors.bg3); anchors.verticalCenter: parent.verticalCenter
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                         Text { 
-                                            anchors.centerIn: parent; 
-                                            text: model.justCopied ? "󰄬" : "󰆏"; 
-                                            color: model.justCopied ? "#A6E3A1" : (copyMouse.containsMouse ? Colors.bg0 : Colors.fg); 
-                                            font.pixelSize: 13; font.family: "JetBrainsMono Nerd Font" 
+                                            anchors.centerIn: parent; text: model.justCopied ? "󰄬" : "󰆏"; color: model.justCopied ? "#A6E3A1" : (copyMouse.containsMouse ? Colors.bg0 : Colors.fg); font.pixelSize: 13; font.family: "JetBrainsMono Nerd Font" 
                                         }
                                         MouseArea {
                                             id: copyMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
@@ -908,7 +1057,110 @@ Rectangle {
     }
 
     // ==========================================
-    // 4. FLOATING OSD
+    // 4. THEMER POPUP WINDOW (CENTERED)
+    // ==========================================
+    PanelWindow {
+        id: themerWindow
+        anchors { top: true; bottom: true; left: true; right: true }
+        color: "transparent"
+        exclusionMode: ExclusionMode.Ignore
+        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+        visible: false
+
+        // Click outside anywhere to close it instantly
+        MouseArea {
+            anchors.fill: parent
+            onClicked: themerWindow.visible = false
+        }
+
+        Rectangle {
+            id: themerBg
+            anchors.centerIn: parent
+            width: 320; height: 140 
+            color: Qt.alpha(Colors.bg0, 0.98)
+            radius: 12
+            border.color: Colors.bg2
+            border.width: 1
+            focus: true
+            
+            Keys.onEscapePressed: themerWindow.visible = false
+
+            MouseArea { anchors.fill: parent } // Prevent clicks falling through to the background
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: 15
+                spacing: 15
+
+                // CLEAN TEXT, NO 'X' BUTTON
+                Column {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 4
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: " Apply Templates"
+                        color: Colors.green
+                        font.pixelSize: 16
+                        font.bold: true
+                    }
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "Apply colors to external applications."
+                        color: Colors.grey1
+                        font.pixelSize: 11
+                    }
+                }
+
+                // TEMPLATE TOGGLES
+                Row {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 15
+
+                    // GTK BUTTON
+                    Rectangle {
+                        width: 120; height: 40; radius: 8
+                        color: dashWidget.gtkEnabled ? Colors.green : Colors.bg1
+                        border.color: dashWidget.gtkEnabled ? Colors.green : Colors.bg2; border.width: 1
+                        Text { 
+                            anchors.centerIn: parent; text: "GTK Apps"
+                            color: dashWidget.gtkEnabled ? Colors.bg0 : Colors.fg; font.bold: true; font.pixelSize: 13
+                        }
+                        MouseArea {
+                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                dashWidget.gtkEnabled = !dashWidget.gtkEnabled;
+                                if (dashWidget.gtkEnabled) dashWidget.applyGtk();
+                                else dashWidget.removeGtk();
+                            }
+                        }
+                    }
+
+                    // ZED BUTTON
+                    Rectangle {
+                        width: 120; height: 40; radius: 8
+                        color: dashWidget.zedEnabled ? Colors.green : Colors.bg1
+                        border.color: dashWidget.zedEnabled ? Colors.green : Colors.bg2; border.width: 1
+                        Text { 
+                            anchors.centerIn: parent; text: "Zed Editor"
+                            color: dashWidget.zedEnabled ? Colors.bg0 : Colors.fg; font.bold: true; font.pixelSize: 13
+                        }
+                        MouseArea {
+                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                dashWidget.zedEnabled = !dashWidget.zedEnabled;
+                                if (dashWidget.zedEnabled) dashWidget.applyZed();
+                                else dashWidget.removeZed();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ==========================================
+    // 5. FLOATING OSD
     // ==========================================
     PanelWindow {
         id: osdWindow
