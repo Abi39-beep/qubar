@@ -5,9 +5,9 @@ import "."
 ShellRoot {
     PanelWindow {
         anchors.top: true
-        width: 570
+        width: 560
         height: 38 
-        margins.top: 2
+        margins.top: 5
         color: "transparent"
 
         Rectangle {

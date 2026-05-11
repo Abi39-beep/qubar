@@ -5,34 +5,75 @@ import "."
 ShellRoot {
     PanelWindow {
         anchors.top: true
-        width: 700
+        anchors.left: true
+        anchors.right: true
         height: 38 
-        margins.top: 2
         color: "transparent"
 
         Rectangle {
             anchors.fill: parent
-            color: Qt.alpha(Colors.bg0, 0.70)
-            radius: 18
+            color: Qt.alpha(Colors.bg0, 0)
 
             Row {
                 anchors.left: parent.left
-                anchors.leftMargin: 15 
+                anchors.leftMargin: 5
                 anchors.verticalCenter: parent.verticalCenter
-                Clock {} 
+                Workspaces {} 
+
             }
 
+            // --- CENTER ROW ---
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: parent.verticalCenter
-                Workspaces {} 
+
+                Rectangle {
+                    id: clockPill
+                    width: timeDisplay.implicitWidth + 24 // Automatically perfectly sized
+                    height: 30
+                    radius: 15
+                    color: Colors.bg1
+                    border.color: Colors.bg2
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Text {
+                        id: timeDisplay
+                        anchors.centerIn: parent
+                        text: Qt.formatDateTime(new Date(), "hh:mm AP")
+                        color: Colors.fg
+                        font.pixelSize: 15
+                        font.family: "JetBrainsMono Nerd Font"
+                        font.bold: true
+                    }
+
+                    // Updates the time every second
+                    Timer {
+                        interval: 1000; running: true; repeat: true
+                        onTriggered: {
+                            timeDisplay.text = Qt.formatDateTime(new Date(), "hh:mm AP");
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: calendarPopup.visible = !calendarPopup.visible
+                    }
+
+                    CalendarWindow {
+                        id: calendarPopup
+                        anchor.item: clockPill
+                        anchor.edges: Edges.Bottom | Edges.Left
+                    }
+                }
             }
 
+            // --- RIGHT ROW ---
             Row {
                 anchors.right: parent.right
-                anchors.rightMargin: 15 
+                anchors.rightMargin: 5
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 5
+                spacing: 8
 
                 WifiWidget {}
                 BluetoothWidget {}
@@ -40,6 +81,7 @@ ShellRoot {
                 DashboardWidget {}
             }
         }
+        
         OsdWindow {}
     }
 }
