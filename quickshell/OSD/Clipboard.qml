@@ -33,7 +33,9 @@ Item {
                 if (sep !== -1 && clipModel.count < 30) {
                     clipModel.append({ 
                         "clipId": lines[i].substring(0, sep), 
-                        "clipText": lines[i].substring(sep + 1) 
+                        "clipText": lines[i].substring(sep + 1),
+                        // FIX: Added the tracking property for the checkmark
+                        "justCopied": false 
                     })
                 }
             }
@@ -62,22 +64,28 @@ Item {
         anchors.right: parent.right
         z: 2
         
-        Row { 
+        Item {
             anchors.centerIn: parent
-            spacing: 6
+            width: childrenRect.width
+            height: childrenRect.height
+            
             Text { 
+                id: clearIconClip
                 text: "󰆴"
                 color: Colors.bg0
-                font.pixelSize: 12
+                font.pixelSize: 13
                 font.family: "JetBrainsMono Nerd Font" 
-                anchors.verticalCenter: parent.verticalCenter // FIX: Perfect Alignment
+                anchors.verticalCenter: clearTextClip.verticalCenter 
+                anchors.verticalCenterOffset: 1 
             }
             Text { 
+                id: clearTextClip
+                anchors.left: clearIconClip.right
+                anchors.leftMargin: 6
                 text: "Clear"
                 color: Colors.bg0
                 font.bold: true
                 font.pixelSize: 12 
-                anchors.verticalCenter: parent.verticalCenter // FIX: Perfect Alignment
             } 
         }
         
@@ -105,6 +113,17 @@ Item {
             color: Colors.bg1
             border.color: Colors.bg2
             border.width: 1
+
+            // FIX: Timer to reset the checkmark back to normal after 1.5 seconds
+            Timer { 
+                id: copySuccessTimer 
+                interval: 1500 
+                onTriggered: {
+                    if (index >= 0 && index < clipModel.count) {
+                        clipModel.setProperty(index, "justCopied", false)
+                    }
+                }
+            }
             
             Row {
                 anchors.fill: parent
@@ -121,21 +140,43 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter 
                 }
                 
+                // COPY BUTTON
                 Rectangle {
                     width: 24
                     height: 24
                     radius: 4
-                    color: Colors.bg3
+                    // FIX: Transparent if ticked, else Blue if hovered, else normal background
+                    color: model.justCopied ? "transparent" : (copyMouse.containsMouse ? Colors.blue : Colors.bg3)
                     anchors.verticalCenter: parent.verticalCenter
+                    
+                    Behavior on color { 
+                        ColorAnimation { 
+                            duration: 150 
+                        } 
+                    }
+                    
                     Text { 
                         anchors.centerIn: parent
-                        text: "󰆏"
-                        color: Colors.fg
+                        // FIX: Shows the Checkmark (󰄬) if copied, otherwise Copy Icon (󰆏)
+                        text: model.justCopied ? "󰄬" : "󰆏"
+                        // FIX: Turns Green if copied, Dark if hovered, Normal if idle
+                        color: model.justCopied ? Colors.green : (copyMouse.containsMouse ? Colors.bg0 : Colors.fg)
                         font.pixelSize: 13
                         font.family: "JetBrainsMono Nerd Font" 
+                        scale: copyMouse.containsMouse ? 1.1 : 1.0
+                        
+                        Behavior on scale { 
+                            NumberAnimation { 
+                                duration: 150
+                                easing.type: Easing.OutBack 
+                            } 
+                        }
                     }
+                    
                     MouseArea { 
+                        id: copyMouse
                         anchors.fill: parent
+                        hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: { 
                             Quickshell.execDetached([
@@ -143,25 +184,47 @@ Item {
                                 "-c", 
                                 "cliphist list | awk -F $'\\t' '$1 == \"" + model.clipId + "\"' | cliphist decode | wl-copy"
                             ])
+                            
+                            // FIX: Triggers the checkmark UI and starts the timer
+                            clipModel.setProperty(index, "justCopied", true)
+                            copySuccessTimer.restart()
                         } 
                     }
                 }
                 
+                // DELETE BUTTON
                 Rectangle {
                     width: 24
                     height: 24
                     radius: 4
-                    color: "transparent"
+                    color: delMouse.containsMouse ? Colors.red : "transparent"
                     anchors.verticalCenter: parent.verticalCenter
+                    
+                    Behavior on color { 
+                        ColorAnimation { 
+                            duration: 150 
+                        } 
+                    }
+                    
                     Text { 
                         anchors.centerIn: parent
                         text: "󰆴"
-                        color: Colors.red
+                        color: delMouse.containsMouse ? Colors.bg0 : Colors.red
                         font.pixelSize: 13
                         font.family: "JetBrainsMono Nerd Font" 
+                        rotation: delMouse.containsMouse ? 15 : 0
+                        
+                        Behavior on rotation { 
+                            NumberAnimation { 
+                                duration: 150 
+                            } 
+                        }
                     }
+                    
                     MouseArea { 
+                        id: delMouse
                         anchors.fill: parent
+                        hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: { 
                             Quickshell.execDetached([

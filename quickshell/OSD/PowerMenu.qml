@@ -41,7 +41,8 @@ PanelWindow {
         { 
             name: "Logout", 
             icon: "󰍃", 
-            cmd: "hyprctl dispatch exit", 
+            // FIX: Restored Hyprland 0.55.0 Lua dispatcher format!
+            cmd: "hyprctl dispatch 'hl.dsp.exit()'", 
             color: Colors.orange 
         },
         { 
@@ -91,10 +92,13 @@ PanelWindow {
         } 
     }
     
-    function openMenu() {
+    function openMenu(index = -1) {
         powerMenuWindow.visible = true
-        powerMenuWindow.activeIndex = -1
-        // FIX: Force focus when the menu is opened via IPC or global shortcut
+        powerMenuWindow.activeIndex = index
+        if (index !== -1) {
+            powerMenuWindow.countdown = 10
+            countdownTimer.restart()
+        }
         powerList.forceActiveFocus()
     }
 
@@ -130,7 +134,6 @@ PanelWindow {
         
         onVisibleChanged: { 
             if (visible) {
-                // FIX: Ensure both the window AND the list have focus
                 powerMenuWindow.forceActiveFocus()
                 powerList.forceActiveFocus()
             }
@@ -147,7 +150,6 @@ PanelWindow {
                 orientation: ListView.Horizontal
                 spacing: 20
                 
-                // FIX: Make sure the ListView can take focus
                 focus: true
                 keyNavigationEnabled: true
                 
@@ -178,7 +180,6 @@ PanelWindow {
                     property bool isFocused: powerList.currentIndex === index && powerList.activeFocus
                     
                     border.width: isActive ? 2 : (isFocused ? 2 : 1)
-                    // FIX: Highlight the border when focused with keyboard!
                     border.color: isActive ? Colors.red : (isFocused ? Colors.aqua : Colors.bg2)
                     
                     scale: fullPowerMouse.containsMouse || isFocused ? 1.05 : 1.0

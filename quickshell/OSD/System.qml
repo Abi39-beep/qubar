@@ -5,8 +5,9 @@ import "."
 
 Row {
     id: sysRoot
-    width: parent ? parent.width : 400
-    height: 50
+    
+    // FIX 1: Gave it a defined height so it doesn't collapse to 0 and turn invisible
+    height: 50 
     spacing: 10
 
     property string cpuUsage: "0.0%"
@@ -55,8 +56,9 @@ Row {
     }
 
     Rectangle {
-        width: (parent.width - 10) / 2
-        height: parent.height
+        // FIX 2: Dynamically calculate half of the parent width minus the 10px spacing
+        width: (sysRoot.width - 10) / 2
+        height: sysRoot.height
         radius: 10
         color: Colors.bg1
         border.width: 1
@@ -64,7 +66,7 @@ Row {
         
         Row {
             anchors.centerIn: parent
-            spacing: 10
+            spacing: 8
             Text {
                 text: "󰻠"
                 color: Colors.aqua
@@ -84,7 +86,7 @@ Row {
                 Text { 
                     text: sysRoot.cpuUsage
                     color: Colors.fg
-                    font.pixelSize: 13
+                    font.pixelSize: 12
                     font.bold: true 
                 }
             }
@@ -92,8 +94,9 @@ Row {
     }
     
     Rectangle {
-        width: (parent.width - 10) / 2
-        height: parent.height
+        // FIX 2: Dynamically calculate half of the parent width minus the 10px spacing
+        width: (sysRoot.width - 10) / 2
+        height: sysRoot.height
         radius: 10
         color: Colors.bg1
         border.width: 1
@@ -101,7 +104,7 @@ Row {
         
         Row {
             anchors.centerIn: parent
-            spacing: 10
+            spacing: 8
             Text {
                 text: "󰍛"
                 color: Colors.orange
@@ -121,7 +124,7 @@ Row {
                 Text { 
                     text: sysRoot.memUsage
                     color: Colors.fg
-                    font.pixelSize: 13
+                    font.pixelSize: 12
                     font.bold: true 
                 }
             }

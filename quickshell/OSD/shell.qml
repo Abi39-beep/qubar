@@ -19,42 +19,46 @@ ShellRoot {
     PowerMenu {
         id: powerMenu
     }
-    
+
     OsdWindow {
         id: bottomOsd
     }
 
+    OsdWorkspace {
+        id:topOsd
+    }
+
     DesktopClock {
-        id: windowCheck
+        id: clock
     }
 
     GlobalShortcut {
-        name: "powermenu" 
+        name: "powermenu"
         onPressed: {
             if (!powerMenu.visible) {
-                powerMenu.openMenu()
+                powerMenu.openMenu();
             } else {
-                powerMenu.closeMenu()
+                powerMenu.closeMenu();
             }
         }
     }
 
     IpcHandler {
         target: "osd"
-        
-        function toggleLeft(): void { 
-            leftSide.toggleLeft() 
+
+        function toggleLeft(): void {
+            leftSide.toggleLeft();
         }
-        
-        function toggleRight(): void { 
-            rightSide.toggleRight() 
+
+        function toggleRight(): void {
+            rightSide.toggleRight();
         }
-        
+
         function togglePower(): void {
             if (!powerMenu.visible) {
-                powerMenu.openMenu()
+                powerMenu.openMenu();
             } else {
-                powerMenu.closeMenu()
+                powerMenu.closeMenu();
             }
         }
     }

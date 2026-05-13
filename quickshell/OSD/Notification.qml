@@ -97,18 +97,63 @@ Item {
                 }
             }
 
+            // EXACT RESTORATION: The Animated 'X' Button
+            Rectangle {
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 12
+                width: 24
+                height: 24
+                radius: 4
+                color: closeMouse.containsMouse ? Colors.red : "transparent"
+                
+                Behavior on color { 
+                    ColorAnimation { duration: 150 } 
+                }
+                
+                Text { 
+                    anchors.centerIn: parent
+                    text: "󰅖" 
+                    color: closeMouse.containsMouse ? Colors.bg0 : Colors.grey1
+                    font.pixelSize: 14
+                    font.family: "JetBrainsMono Nerd Font" 
+                    
+                    rotation: closeMouse.containsMouse ? 90 : 0
+                    Behavior on rotation { 
+                        NumberAnimation { duration: 250; easing.type: Easing.OutBack } 
+                    }
+                }
+                
+                MouseArea {
+                    id: closeMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (cardRoot.isOsd) {
+                            cardRoot.osdExpired = true
+                        } else {
+                            if (modelData) {
+                                try { 
+                                    modelData.dismiss() 
+                                } catch(e) {}
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Click body to invoke default action
             MouseArea {
                 anchors.fill: parent
-                hoverEnabled: true
+                z: -1
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
                     if (cardRoot.isOsd) {
                         cardRoot.osdExpired = true
                     } else {
                         if (modelData) {
-                            try { 
-                                modelData.dismiss() 
-                            } catch(e) {}
+                            try { modelData.invokeDefault() } catch(e) {}
                         }
                     }
                 }
@@ -125,22 +170,29 @@ Item {
         anchors.right: parent.right
         z: 2
         
-        Row { 
+        // FIX: Perfectly aligned Icon and Text
+        Item {
             anchors.centerIn: parent
-            spacing: 6
+            width: childrenRect.width
+            height: childrenRect.height
+            
             Text { 
+                id: clearIcon
                 text: "󰆴"
                 color: Colors.bg0
-                font.pixelSize: 12
+                font.pixelSize: 13
                 font.family: "JetBrainsMono Nerd Font" 
-                anchors.verticalCenter: parent.verticalCenter // FIX: Perfect Alignment
+                anchors.verticalCenter: clearText.verticalCenter 
+                anchors.verticalCenterOffset: 1 // Nudges the icon down to perfectly match text baseline
             }
             Text { 
+                id: clearText
+                anchors.left: clearIcon.right
+                anchors.leftMargin: 6
                 text: "Clear"
                 color: Colors.bg0
                 font.bold: true
                 font.pixelSize: 12 
-                anchors.verticalCenter: parent.verticalCenter // FIX: Perfect Alignment
             } 
         }
         

@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Io
 import "."
 
 PanelWindow {
@@ -31,14 +32,6 @@ PanelWindow {
             rightOSDWindow.visible = false 
         }
     }
-
-    property var actionModel:[
-        { name: "Lock", icon: "", cmd: "loginctl lock-session", color: Colors.blue },
-        { name: "Sleep", icon: "󰤄", cmd: "systemctl suspend", color: Colors.blue },
-        { name: "Logout", icon: "󰍃", cmd: "hyprctl dispatch exit", color: Colors.orange },
-        { name: "Reboot", icon: "", cmd: "systemctl reboot", color: Colors.orange },
-        { name: "Power", icon: "", cmd: "systemctl poweroff", color: Colors.red }
-    ]
 
     Rectangle {
         id: rightBg
@@ -73,12 +66,12 @@ PanelWindow {
             anchors.margins: 25
             spacing: 20
 
-            // Direct Power Button Row
+            // 1. Direct Power Button Row
             Row {
                 width: parent.width
                 spacing: 10
                 Repeater {
-                    model: rightOSDWindow.actionModel
+                    model: powerMenu.actionModel
                     Rectangle {
                         width: (parent.width - 40) / 5
                         height: 60
@@ -111,7 +104,7 @@ PanelWindow {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 rightOSDWindow.visible = false
-                                Quickshell.execDetached(["quickshell", "ipc", "call", "osd", "togglePower"])
+                                powerMenu.openMenu(index)
                             }
                         }
                     }
@@ -124,7 +117,26 @@ PanelWindow {
                 color: Colors.bg2 
             }
 
-            System {}
+            // 2. CPU, Memory, and Battery Perfectly Aligned in One Row!
+            Row {
+                width: parent.width
+                height: 50
+                spacing: 10
+
+                System {
+                    // System.qml handles 2 items. We give it 2/3 of the total width + the 10px spacing between them.
+                    width: ((parent.width - 20) / 3) * 2 + 10
+                }
+
+                Battery {
+                    // Battery.qml handles 1 item. We give it exactly 1/3 of the total width.
+                    width: (parent.width - 20) / 3
+
+                    onCloseMainPanel: {
+                        rightOSDWindow.visible = false
+                    }
+                }
+            }
 
             Rectangle { 
                 width: parent.width
@@ -132,6 +144,7 @@ PanelWindow {
                 color: Colors.bg2 
             }
 
+            // 3. Network & Bluetooth
             Row {
                 width: parent.width
                 spacing: 15
@@ -153,6 +166,7 @@ PanelWindow {
                 color: Colors.bg2 
             }
 
+            // 4. Templates
             Template {
                 onCloseMainPanel: {
                     rightOSDWindow.visible = false
@@ -167,12 +181,11 @@ PanelWindow {
 
             property int activeTab: 0
 
-            // 5. TABS - PERFECTLY ALIGNED NOW
+            // 5. Tabs
             Row {
                 width: parent.width
                 height: 40
                 spacing: 15
-                
                 Rectangle {
                     width: (parent.width - 15) / 2
                     height: parent.height
@@ -180,7 +193,6 @@ PanelWindow {
                     color: parent.parent.activeTab === 0 ? Colors.bg2 : Colors.bg1
                     border.width: 1
                     border.color: parent.parent.activeTab === 0 ? Colors.bg3 : Colors.bg2
-                    
                     Row { 
                         anchors.centerIn: parent
                         spacing: 8
@@ -189,14 +201,14 @@ PanelWindow {
                             color: parent.parent.parent.parent.activeTab === 0 ? Colors.yellow : Colors.grey1
                             font.pixelSize: 14
                             font.family: "JetBrainsMono Nerd Font" 
-                            anchors.verticalCenter: parent.verticalCenter // <--- FIXED
+                            anchors.verticalCenter: parent.verticalCenter
                         }
                         Text { 
                             text: "Notifications"
                             color: Colors.fg
                             font.bold: true
                             font.pixelSize: 13 
-                            anchors.verticalCenter: parent.verticalCenter // <--- FIXED
+                            anchors.verticalCenter: parent.verticalCenter
                         }
                     }
                     MouseArea { 
@@ -207,7 +219,6 @@ PanelWindow {
                         } 
                     }
                 }
-                
                 Rectangle {
                     width: (parent.width - 15) / 2
                     height: parent.height
@@ -215,7 +226,6 @@ PanelWindow {
                     color: parent.parent.activeTab === 1 ? Colors.bg2 : Colors.bg1
                     border.width: 1
                     border.color: parent.parent.activeTab === 1 ? Colors.bg3 : Colors.bg2
-                    
                     Row { 
                         anchors.centerIn: parent
                         spacing: 8
@@ -224,14 +234,14 @@ PanelWindow {
                             color: parent.parent.parent.parent.activeTab === 1 ? Colors.orange : Colors.grey1
                             font.pixelSize: 14
                             font.family: "JetBrainsMono Nerd Font" 
-                            anchors.verticalCenter: parent.verticalCenter // <--- FIXED
+                            anchors.verticalCenter: parent.verticalCenter
                         }
                         Text { 
                             text: "Clipboard"
                             color: Colors.fg
                             font.bold: true
                             font.pixelSize: 13 
-                            anchors.verticalCenter: parent.verticalCenter // <--- FIXED
+                            anchors.verticalCenter: parent.verticalCenter
                         }
                     }
                     MouseArea { 
@@ -244,6 +254,7 @@ PanelWindow {
                 }
             }
 
+            // 6. Content Views
             Item {
                 width: parent.width
                 height: parent.parent.height - y - 25
