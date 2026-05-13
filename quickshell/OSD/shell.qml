@@ -24,6 +24,10 @@ ShellRoot {
         id: bottomOsd
     }
 
+    DesktopClock {
+        id: windowCheck
+    }
+
     GlobalShortcut {
         name: "powermenu" 
         onPressed: {
