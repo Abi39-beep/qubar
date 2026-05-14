@@ -45,14 +45,20 @@ Item {
             Rectangle {
                 id: timeoutBar
                 height: 3
-                width: cardRoot.isOsd ? parent.width : 0
-                color: (modelData && modelData.urgency === 2) ? Colors.red : Colors.aqua
+                
+                // FIX: Inset the bar so it perfectly avoids the rounded corner and stays inside the border!
                 anchors.bottom: parent.bottom
+                anchors.bottomMargin: 1
                 anchors.left: parent.left
+                anchors.leftMargin: 10
+                radius: 1.5 
+                
+                width: cardRoot.isOsd ? (parent.width - 20) : 0
+                color: (modelData && modelData.urgency === 2) ? Colors.red : Colors.aqua
                 opacity: cardRoot.isOsd ? 1 : 0
                 
                 PropertyAnimation on width { 
-                    from: cardRoot.width
+                    from: cardRoot.width - 20
                     to: 0
                     duration: 5000
                     running: cardRoot.isOsd && modelData && modelData.urgency !== 2 
@@ -240,6 +246,7 @@ Item {
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Overlay
         
+        // Hide if parent panel is open (meaning main OS window is active)
         visible: !notifRoot.visible
 
         Column {
