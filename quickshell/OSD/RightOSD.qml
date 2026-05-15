@@ -12,6 +12,7 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+    WlrLayershell.namespace: "rightosd"
     
     anchors { 
         right: true
@@ -42,7 +43,7 @@ PanelWindow {
             bottom: parent.bottom 
         }
         anchors.margins: 20
-        color: Qt.alpha(Colors.bg0, 0.95)
+        color: Qt.alpha(Colors.bg0, 0.50)
         border.color: Colors.bg2
         border.width: 2
         radius: 15

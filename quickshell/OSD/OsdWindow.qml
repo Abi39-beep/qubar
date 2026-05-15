@@ -15,6 +15,7 @@ PanelWindow {
 
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
+    WlrLayershell.namespace: "bottomosd"
     visible: osdOpacity > 0
     
     property real osdOpacity: 0
@@ -115,7 +116,7 @@ PanelWindow {
         
         opacity: osdRoot.osdOpacity
         
-        color: Colors.bg0
+        color: Qt.alpha(Colors.bg0, 0.50)
         border.color: Colors.bg2
         border.width: 1
         radius: 25 

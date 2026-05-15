@@ -168,7 +168,7 @@ Rectangle {
                                 anchors.centerIn: parent
                                 text: parent.isCurrent ? "● " + modelData.name : "  " + modelData.name
                                 color: parent.isCurrent ? Colors.green : Colors.fg
-                                font.pixelSize: 14
+                                font.pixelSize: 16
                                 font.bold: parent.isCurrent
                                 font.family: "JetBrainsMono Nerd Font"
                             }

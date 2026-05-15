@@ -159,7 +159,7 @@ Item {
         Rectangle {
             anchors.centerIn: parent
             width: 320
-            height: 400
+            height: 200
             color: Qt.alpha(Colors.bg0, 0.98)
             border.color: Colors.bg2
             border.width: 1

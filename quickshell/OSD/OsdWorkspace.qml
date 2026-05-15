@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Wayland
 import Quickshell.Hyprland
 
 PanelWindow {
@@ -13,6 +14,8 @@ PanelWindow {
 
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
+    WlrLayershell.namespace: "workspaceosd"
+    WlrLayershell.layer: WlrLayer.Overlay
     aboveWindows: true
     visible: osdOpacity > 0
 
@@ -85,7 +88,7 @@ PanelWindow {
             opacity: osdRoot.osdOpacity
 
             radius: boxHeight / 2
-            color: (typeof Colors !== "undefined") ? Colors.bg0 : "#222222"
+            color: (typeof Colors !== "undefined") ? Qt.alpha(Colors.bg0, 0.50) : Qt.alpha("#222222", 0.50)
             border.color: (typeof Colors !== "undefined") ? Colors.bg2 : "#3a3a3a"
             border.width: 1
 
