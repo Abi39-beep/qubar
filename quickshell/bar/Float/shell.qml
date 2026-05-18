@@ -1,13 +1,13 @@
 import QtQuick
 import Quickshell
-import "." 
+import "./widget/"
 
 ShellRoot {
     PanelWindow {
         anchors.top: true
         anchors.left: true
         anchors.right: true
-        height: 38 
+        height: 38
         color: "transparent"
 
         Rectangle {
@@ -18,8 +18,7 @@ ShellRoot {
                 anchors.left: parent.left
                 anchors.leftMargin: 5
                 anchors.verticalCenter: parent.verticalCenter
-                Workspaces {} 
-
+                Workspaces {}
             }
 
             // --- CENTER ROW ---
@@ -48,7 +47,9 @@ ShellRoot {
 
                     // Updates the time every second
                     Timer {
-                        interval: 1000; running: true; repeat: true
+                        interval: 1000
+                        running: true
+                        repeat: true
                         onTriggered: {
                             timeDisplay.text = Qt.formatDateTime(new Date(), "hh:mm AP");
                         }
@@ -81,7 +82,7 @@ ShellRoot {
                 DashboardWidget {}
             }
         }
-        
+
         OsdWindow {}
     }
 }
