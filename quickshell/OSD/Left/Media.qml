@@ -2,15 +2,14 @@ import QtQuick
 import QtQuick.Controls
 import Quickshell
 import Quickshell.Services.Mpris
+import Quickshell.Io
 import ".."
 
 Rectangle {
     id: root
 
-    implicitWidth: 420
-    implicitHeight: 130
-    width: parent ? parent.width : implicitWidth
-    height: implicitHeight
+    width: parent ? parent.width : 400
+    height: 130
     radius: 12
     color: Colors.bg1
     border.color: Colors.bg2
@@ -24,221 +23,241 @@ Rectangle {
     readonly property string _title: hasPlayer && player.trackTitle ? player.trackTitle : "No Media"
     readonly property string _artist: hasPlayer && player.trackArtist ? player.trackArtist : ""
     readonly property string _identity: hasPlayer && player.identity ? player.identity : ""
-    readonly property bool _canGoNext: hasPlayer ? player.canGoNext : false
-    readonly property bool _canGoPrevious: hasPlayer ? player.canGoPrevious : false
     readonly property string _artUrl: hasPlayer && player.trackArtUrl ? resolveArtUrl(player.trackArtUrl) : ""
 
+    property real _length: 0
+    property real _position: 0
+
+    function formatTime(totalSeconds) {
+        if (totalSeconds <= 0 || isNaN(totalSeconds))
+            return "0:00";
+        let mins = Math.floor(totalSeconds / 60);
+        let secs = Math.floor(totalSeconds % 60);
+        return mins + ":" + (secs < 10 ? "0" : "") + secs;
+    }
+
     function resolveArtUrl(url) {
-        if (!url) return ""
-        var s = url.toString()
-        if (s.indexOf("http://") === 0 || s.indexOf("https://") === 0 || s.indexOf("file://") === 0)
-            return s
-        return "file://" + s
+        if (!url)
+            return "";
+        var s = url.toString();
+        if (s.indexOf("http") === 0 || s.indexOf("file") === 0)
+            return s;
+        return "file://" + s;
     }
 
-    function selectBestPlayer() {
-        var list = Mpris.players.values
-        var best = null
-        for (var i = 0; i < list.length; i++) {
-            var p = list[i]
-            if (!p) continue
-            if (p.playbackState === MprisPlaybackState.Playing) {
-                best = p
-                break
+    Process {
+        id: syncTime
+        command: ["bash", "-c", "echo $(playerctl metadata --format '{{mpris:length}}') $(playerctl position)"]
+        stdout: SplitParser {
+            onRead: data => {
+                let parts = data.trim().split(" ");
+                if (parts.length >= 2) {
+                    let rawLen = parseFloat(parts[0]);
+                    let rawPos = parseFloat(parts[1]);
+                    if (!isNaN(rawLen))
+                        root._length = rawLen / 1000000;
+                    if (!isNaN(rawPos))
+                        root._position = rawPos;
+                }
             }
-            if (best === null) best = p
-        }
-        if (best !== root.player) {
-            root.player = best
         }
     }
-
-    Component.onCompleted: selectBestPlayer()
 
     Timer {
-        id: playerMonitor
-        interval: 2000
+        interval: 500
         running: true
         repeat: true
-        onTriggered: selectBestPlayer()
-    }
-
-    Connections {
-        target: root.player
-        enabled: root.hasPlayer
-
-        function onPlaybackStateChanged() {
-            selectBestPlayer()
+        onTriggered: {
+            let players = Mpris.players.values;
+            let best = null;
+            for (let i = 0; i < players.length; i++) {
+                if (players[i] && players[i].playbackState === MprisPlaybackState.Playing) {
+                    best = players[i];
+                    break;
+                }
+                if (players[i] && !best)
+                    best = players[i];
+            }
+            root.player = best;
+            if (root.hasPlayer)
+                syncTime.running = true;
         }
     }
 
     Row {
         anchors.fill: parent
-        anchors.margins: 15
-        spacing: 15
+        anchors.margins: 12
+        spacing: 12
 
         Rectangle {
-            width: 100
-            height: 100
+            width: 105
+            height: 105
             radius: 10
             color: Colors.bg2
             clip: true
-
+            anchors.verticalCenter: parent.verticalCenter
             Image {
-                id: artImage
                 anchors.fill: parent
                 source: root._artUrl
                 fillMode: Image.PreserveAspectCrop
-                mipmap: true
                 smooth: true
-                asynchronous: true
-                antialiasing: true
-                cache: true
             }
-
             Text {
                 anchors.centerIn: parent
                 text: "\uf001"
                 color: Colors.grey1
                 font.pixelSize: 32
                 font.family: "JetBrainsMono Nerd Font"
-                visible: artImage.status !== Image.Ready || root._artUrl === ""
+                visible: !root._artUrl
             }
         }
 
-        Item {
-            width: parent.width - 115
-            height: 100
+        Column {
+            width: parent.width - 129
+            height: 105
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 0
 
             Item {
                 width: parent.width
-                height: 40
-                anchors.top: parent.top
-
+                height: 44
                 Column {
                     anchors.left: parent.left
                     anchors.right: playerIcon.left
-                    anchors.rightMargin: 10
-                    spacing: 2
-
+                    anchors.rightMargin: 5
                     Text {
                         text: root._title
                         color: Colors.fg
-                        font.pixelSize: 16
+                        font.pixelSize: 17
                         font.bold: true
                         elide: Text.ElideRight
-                        maximumLineCount: 1
                         width: parent.width
                     }
-
                     Text {
                         text: root._artist
                         color: Colors.grey1
                         font.pixelSize: 13
                         elide: Text.ElideRight
-                        maximumLineCount: 1
                         width: parent.width
                     }
                 }
-
                 Text {
                     id: playerIcon
                     anchors.right: parent.right
-                    anchors.top: parent.top
-                    text: {
-                        if (!root._identity) return "\uf001"
-                        var id = root._identity.toLowerCase()
-                        if (id.indexOf("spotify") !== -1) return "\uf1bc"
-                        if (id.indexOf("firefox") !== -1 || id.indexOf("mozilla") !== -1) return "\uf269"
-                        return "\uf001"
-                    }
+                    text: root._identity.toLowerCase().includes("spotify") ? "\uf1bc" : "\uf001"
                     color: Colors.fg
-                    font.pixelSize: 16
+                    font.pixelSize: 18
                     font.family: "JetBrainsMono Nerd Font"
                 }
             }
 
-            Item {
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 10
+            // --- PROGRESS BAR WITH CLICK FUNCTION ---
+            Rectangle {
+                id: barBg
                 width: parent.width
-                height: 28
+                height: 8
+                radius: 4
+                color: Colors.bg2
 
+                Rectangle {
+                    width: (root._length > 0) ? Math.min((root._position / root._length), 1.0) * barBg.width : 0
+                    height: parent.height
+                    radius: 4
+                    color: Colors.fg
+                }
+
+                // Seek MouseArea
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (root._length > 0) {
+                            // Calculate percentage based on mouse X position
+                            let percentage = mouseX / width;
+                            let seekTarget = percentage * root._length;
+
+                            // Send seek command
+                            Quickshell.execDetached(["playerctl", "position", seekTarget.toString()]);
+
+                            // Update local UI immediately for responsiveness
+                            root._position = seekTarget;
+                        }
+                    }
+                }
+            }
+
+            Item {
+                width: parent.width
+                height: 48
+                Text {
+                    text: formatTime(root._position)
+                    color: Colors.fg
+                    font.pixelSize: 12
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 8
+                }
                 Row {
-                    anchors.centerIn: parent
-                    spacing: 12
-
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 2
+                    spacing: 8
                     Rectangle {
-                        width: 32
+                        width: 36
                         height: 32
                         radius: 6
                         color: Colors.bg2
-
                         Text {
                             anchors.centerIn: parent
                             text: "\uf048"
                             color: Colors.fg
-                            font.pixelSize: 14
                             font.family: "JetBrainsMono Nerd Font"
                         }
-
                         MouseArea {
                             anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (root.hasPlayer && root._canGoPrevious)
-                                    root.player.previous()
-                            }
+                            onClicked: Quickshell.execDetached(["playerctl", "previous"])
                         }
                     }
-
                     Rectangle {
-                        width: 32
+                        width: 36
                         height: 32
                         radius: 6
                         color: Colors.bg2
-
                         Text {
                             anchors.centerIn: parent
                             text: root.isPlaying ? "\uf04c" : "\uf04b"
                             color: Colors.fg
-                            font.pixelSize: 14
                             font.family: "JetBrainsMono Nerd Font"
                         }
-
                         MouseArea {
                             anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (root.hasPlayer)
-                                    root.player.togglePlaying()
-                            }
+                            onClicked: Quickshell.execDetached(["playerctl", "play-pause"])
                         }
                     }
-
                     Rectangle {
-                        width: 32
+                        width: 36
                         height: 32
                         radius: 6
                         color: Colors.bg2
-
                         Text {
                             anchors.centerIn: parent
                             text: "\uf051"
                             color: Colors.fg
-                            font.pixelSize: 14
                             font.family: "JetBrainsMono Nerd Font"
                         }
-
                         MouseArea {
                             anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (root.hasPlayer && root._canGoNext)
-                                    root.player.next()
-                            }
+                            onClicked: Quickshell.execDetached(["playerctl", "next"])
                         }
                     }
+                }
+                Text {
+                    text: formatTime(root._length)
+                    color: Colors.fg
+                    font.pixelSize: 12
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 8
                 }
             }
         }
