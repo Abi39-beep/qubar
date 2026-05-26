@@ -15,7 +15,7 @@ Item {
 
     property bool isBtOn: false
     property string activeBtDevice: ""
-    property bool isWiredHeadset: false // Now updated via shell command
+    property bool isWiredHeadset: false
 
     ListModel {
         id: btModel
@@ -23,7 +23,6 @@ Item {
 
     Process {
         id: refreshStatus
-        // Command checks: 1. BT Power, 2. Connected BT Devices, 3. All BT Devices, 4. Audio Jack Status
         command: ["bash", "-c", "bluetoothctl show | grep 'Powered: yes'; echo '---'; bluetoothctl devices Connected; echo '---'; bluetoothctl devices; echo '---'; pactl list sinks | grep -i 'Active Port:.*headphone'"]
         property string fullOutput: ""
         stdout: SplitParser {
@@ -35,10 +34,8 @@ Item {
             let sections = fullOutput.split("---\n");
             fullOutput = "";
             if (sections.length >= 4) {
-                // 1. BT Power
                 btRoot.isBtOn = sections[0].indexOf("Powered: yes") !== -1;
 
-                // 2. Connected BT Devices
                 let connectedMacs = {};
                 let connectedLines = sections[1].split("\n");
                 btRoot.activeBtDevice = "";
@@ -51,7 +48,6 @@ Item {
                     }
                 }
 
-                // 3. All BT Devices for the list
                 btModel.clear();
                 let allLines = sections[2].split("\n");
                 for (let i = 0; i < allLines.length; i++) {
@@ -66,9 +62,6 @@ Item {
                         });
                     }
                 }
-
-                // 4. Wired Jack Status
-                // If the grep found 'headphone' in the active port, it will not be empty
                 btRoot.isWiredHeadset = sections[3].trim().length > 0;
             }
         }
@@ -104,16 +97,13 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 12
 
-            // Icon Circle
             Rectangle {
                 width: 40
                 height: 40
                 radius: 20
                 color: btRoot.isWiredHeadset ? Colors.blue : (btRoot.isBtOn ? Colors.aqua : Colors.bg3)
-
                 Text {
                     anchors.centerIn: parent
-                    // Icon logic: Wired Headset icon vs Bluetooth icons
                     text: btRoot.isWiredHeadset ? "󰋋" : (btRoot.isBtOn ? "󰂯" : "󰂲")
                     color: (btRoot.isBtOn || btRoot.isWiredHeadset) ? Colors.bg0 : Colors.fg
                     font.pixelSize: 20
@@ -124,16 +114,12 @@ Item {
             Column {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 2
-
-                // Main Title: Switches from "Bluetooth" to "Headset" when wired
                 Text {
                     text: btRoot.isWiredHeadset ? "Headset" : "Bluetooth"
                     color: Colors.fg
                     font.bold: true
                     font.pixelSize: 14
                 }
-
-                // Sub Label: Displays "Wired Headset" or BT status
                 Text {
                     text: {
                         if (btRoot.isWiredHeadset)
@@ -172,24 +158,32 @@ Item {
 
         Rectangle {
             anchors.centerIn: parent
-            width: 320
-            height: 400
+            width: 340
+            height: 200
             color: Qt.alpha(Colors.bg0, 0.98)
             border.color: Colors.bg2
             border.width: 1
             radius: 12
 
+            focus: true
+            Keys.onEscapePressed: btPopupWindow.visible = false
+            onVisibleChanged: {
+                if (visible)
+                    forceActiveFocus();
+            }
+
             MouseArea {
                 anchors.fill: parent
             }
 
-            Column {
+            ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 15
-                spacing: 15
+                spacing: 10
 
                 RowLayout {
-                    width: parent.width
+                    Layout.fillWidth: true
+                    spacing: 12
                     Text {
                         Layout.fillWidth: true
                         text: "Bluetooth Devices"
@@ -201,11 +195,27 @@ Item {
                     Text {
                         text: "󰑐"
                         color: Colors.blue
-                        font.pixelSize: 16
+                        font.pixelSize: 18
                         font.family: "JetBrainsMono Nerd Font"
                         MouseArea {
                             anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
                             onClicked: refreshStatus.running = true
+                        }
+                    }
+
+                    Text {
+                        text: "󰒓"
+                        color: Colors.fg
+                        font.pixelSize: 18
+                        font.family: "JetBrainsMono Nerd Font"
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                Quickshell.execDetached(["overskride"]);
+                                btPopupWindow.visible = false;
+                            }
                         }
                     }
 
@@ -238,20 +248,25 @@ Item {
                 }
 
                 Rectangle {
-                    width: parent.width
+                    Layout.fillWidth: true
                     height: 1
                     color: Colors.bg2
                 }
 
+                // SCROLLABLE LIST VIEW
                 ListView {
-                    width: parent.width
-                    height: 280
-                    clip: true
-                    spacing: 8
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true // Takes up remaining space in the 220px window
+                    clip: true // ESSENTIAL: Hides items that scroll out of the 220px box
+                    spacing: 6
                     model: btModel
+
+                    // Optimization for smoother scrolling
+                    boundsBehavior: Flickable.StopAtBounds
+
                     delegate: Rectangle {
-                        width: 290
-                        height: 40
+                        width: 310
+                        height: 38
                         radius: 8
                         color: model.connected ? Qt.alpha(Colors.aqua, 0.1) : "transparent"
                         Text {
@@ -262,7 +277,7 @@ Item {
                             color: model.connected ? Colors.aqua : Colors.fg
                             font.pixelSize: 13
                             elide: Text.ElideRight
-                            width: 160
+                            width: 180
                         }
                         Rectangle {
                             anchors.right: parent.right
