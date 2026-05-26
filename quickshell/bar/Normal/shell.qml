@@ -49,7 +49,7 @@ ShellRoot {
                             Text {
                                 anchors.centerIn: parent
                                 text: modelData
-                                font.pixelSize: 15
+                                font.pixelSize: 13
                                 font.family: "JetBrainsMono Nerd Font"
                                 font.bold: parent.isFocused
                                 color: parent.isFocused ? Colors.bg0 : (parent.isOccupied ? Colors.fg : Colors.grey1)
@@ -94,7 +94,7 @@ ShellRoot {
                         anchors.centerIn: parent
                         text: Qt.formatDateTime(new Date(), "hh:mm AP")
                         color: Colors.fg
-                        font.pixelSize: 15
+                        font.pixelSize: 13
                         font.family: "JetBrainsMono Nerd Font"
                         font.bold: true
                     }

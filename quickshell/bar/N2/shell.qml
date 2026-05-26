@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import "./widget/"
+import "./meth/"
 
 ShellRoot {
     PanelWindow {

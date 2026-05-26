@@ -4,7 +4,8 @@ import ".."
 
 Item {
     id: clockWidget
-    width: 70; height: 30
+    width: 70
+    height: 30
     anchors.verticalCenter: parent.verticalCenter
 
     Text {
@@ -18,7 +19,9 @@ Item {
     }
 
     Timer {
-        interval: 1000; running: true; repeat: true
+        interval: 1000
+        running: true
+        repeat: true
         onTriggered: {
             var now = new Date();
             timeDisplay.text = Qt.formatDateTime(now, "hh:mm AP");

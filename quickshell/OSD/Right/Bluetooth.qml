@@ -11,70 +11,65 @@ Item {
     width: (parent.width - 15) / 2
     height: 65
 
-    signal closeMainPanel()
+    signal closeMainPanel
 
     property bool isBtOn: false
     property string activeBtDevice: ""
+    property bool isWiredHeadset: false // Now updated via shell command
 
-    PwObjectTracker { 
-        id: rightPwTracker
-        objects: Pipewire.defaultAudioSink ?[Pipewire.defaultAudioSink] :[] 
+    ListModel {
+        id: btModel
     }
-    
-    property var rightAudio: Pipewire.defaultAudioSink
-    property string desc: rightAudio ? rightAudio.description : ""
-    property bool isWiredHeadset: desc.toLowerCase().indexOf("analog") !== -1 || desc.toLowerCase().indexOf("headset") !== -1 || desc.toLowerCase().indexOf("headphone") !== -1
 
-    ListModel { 
-        id: btModel 
-    }
-    
     Process {
-        id: refreshBt
-        command:[
-            "bash", 
-            "-c", 
-            "bluetoothctl show | grep 'Powered: yes'; echo '---'; bluetoothctl devices Connected; echo '---'; bluetoothctl devices"
-        ]
+        id: refreshStatus
+        // Command checks: 1. BT Power, 2. Connected BT Devices, 3. All BT Devices, 4. Audio Jack Status
+        command: ["bash", "-c", "bluetoothctl show | grep 'Powered: yes'; echo '---'; bluetoothctl devices Connected; echo '---'; bluetoothctl devices; echo '---'; pactl list sinks | grep -i 'Active Port:.*headphone'"]
         property string fullOutput: ""
-        stdout: SplitParser { 
-            onRead: data => { 
-                refreshBt.fullOutput += data + "\n" 
-            } 
+        stdout: SplitParser {
+            onRead: data => {
+                refreshStatus.fullOutput += data + "\n";
+            }
         }
         onExited: {
-            let sections = fullOutput.split("---\n")
-            fullOutput = ""
-            if (sections.length >= 3) {
-                btRoot.isBtOn = sections[0].indexOf("Powered: yes") !== -1
-                
-                let connectedMacs = {}
-                let connectedLines = sections[1].split("\n")
-                btRoot.activeBtDevice = ""
-                
-                for (let i = 0; i < connectedLines.length; i++) { 
+            let sections = fullOutput.split("---\n");
+            fullOutput = "";
+            if (sections.length >= 4) {
+                // 1. BT Power
+                btRoot.isBtOn = sections[0].indexOf("Powered: yes") !== -1;
+
+                // 2. Connected BT Devices
+                let connectedMacs = {};
+                let connectedLines = sections[1].split("\n");
+                btRoot.activeBtDevice = "";
+
+                for (let i = 0; i < connectedLines.length; i++) {
                     if (connectedLines[i].startsWith("Device ")) {
-                        let parts = connectedLines[i].split(" ")
-                        connectedMacs[parts[1]] = true
-                        btRoot.activeBtDevice = parts.slice(2).join(" ")
+                        let parts = connectedLines[i].split(" ");
+                        connectedMacs[parts[1]] = true;
+                        btRoot.activeBtDevice = parts.slice(2).join(" ");
                     }
                 }
-                
-                btModel.clear()
-                let allLines = sections[2].split("\n")
-                
+
+                // 3. All BT Devices for the list
+                btModel.clear();
+                let allLines = sections[2].split("\n");
                 for (let i = 0; i < allLines.length; i++) {
                     if (allLines[i].startsWith("Device ")) {
-                        let parts = allLines[i].split(" ")
-                        let mac = parts[1]
-                        let name = parts.slice(2).join(" ")
-                        btModel.append({ 
-                            "mac": mac, 
-                            "name": name, 
-                            "connected": (connectedMacs[mac] === true) 
-                        })
+                        let parts = allLines[i].split(" ");
+                        let mac = parts[1];
+                        let name = parts.slice(2).join(" ");
+                        btModel.append({
+                            "mac": mac,
+                            "name": name,
+                            "connected": (connectedMacs[mac] === true)
+                        });
                     }
                 }
+
+                // 4. Wired Jack Status
+                // If the grep found 'headphone' in the active port, it will not be empty
+                btRoot.isWiredHeadset = sections[3].trim().length > 0;
             }
         }
     }
@@ -83,9 +78,7 @@ Item {
         interval: 2000
         running: true
         repeat: true
-        onTriggered: {
-            refreshBt.running = true
-        }
+        onTriggered: refreshStatus.running = true
     }
 
     Rectangle {
@@ -94,49 +87,64 @@ Item {
         color: Colors.bg1
         border.color: Colors.bg2
         border.width: 1
-        
+
         MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
-            onClicked: { 
-                btRoot.closeMainPanel()
-                btPopupWindow.visible = true 
-                refreshBt.running = true
+            onClicked: {
+                btRoot.closeMainPanel();
+                btPopupWindow.visible = true;
+                refreshStatus.running = true;
             }
         }
-        
+
         Row {
             anchors.left: parent.left
             anchors.leftMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             spacing: 12
+
+            // Icon Circle
             Rectangle {
                 width: 40
                 height: 40
                 radius: 20
                 color: btRoot.isWiredHeadset ? Colors.blue : (btRoot.isBtOn ? Colors.aqua : Colors.bg3)
-                Text { 
+
+                Text {
                     anchors.centerIn: parent
+                    // Icon logic: Wired Headset icon vs Bluetooth icons
                     text: btRoot.isWiredHeadset ? "󰋋" : (btRoot.isBtOn ? "󰂯" : "󰂲")
-                    color: btRoot.isBtOn || btRoot.isWiredHeadset ? Colors.bg0 : Colors.fg
+                    color: (btRoot.isBtOn || btRoot.isWiredHeadset) ? Colors.bg0 : Colors.fg
                     font.pixelSize: 20
-                    font.family: "JetBrainsMono Nerd Font" 
+                    font.family: "JetBrainsMono Nerd Font"
                 }
             }
+
             Column {
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 4
-                Text { 
-                    text: "Bluetooth"
+                spacing: 2
+
+                // Main Title: Switches from "Bluetooth" to "Headset" when wired
+                Text {
+                    text: btRoot.isWiredHeadset ? "Headset" : "Bluetooth"
                     color: Colors.fg
                     font.bold: true
-                    font.pixelSize: 14 
+                    font.pixelSize: 14
                 }
-                Text { 
-                    text: btRoot.isWiredHeadset ? "Wired Headset" : (btRoot.isBtOn ? (btRoot.activeBtDevice || "On") : "Off")
+
+                // Sub Label: Displays "Wired Headset" or BT status
+                Text {
+                    text: {
+                        if (btRoot.isWiredHeadset)
+                            return "Wired Headset";
+                        if (btRoot.activeBtDevice !== "")
+                            return btRoot.activeBtDevice;
+                        return btRoot.isBtOn ? "On" : "Off";
+                    }
                     color: Colors.grey1
                     font.pixelSize: 11
-                    width: 90
+                    width: 100
                     elide: Text.ElideRight
                 }
             }
@@ -145,11 +153,11 @@ Item {
 
     PanelWindow {
         id: btPopupWindow
-        anchors { 
+        anchors {
             top: true
             bottom: true
             left: true
-            right: true 
+            right: true
         }
         color: "transparent"
         visible: false
@@ -157,153 +165,123 @@ Item {
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
-        MouseArea { 
+        MouseArea {
             anchors.fill: parent
-            hoverEnabled: true
-            onClicked: { 
-                btPopupWindow.visible = false 
-            } 
+            onClicked: btPopupWindow.visible = false
         }
 
         Rectangle {
             anchors.centerIn: parent
             width: 320
-            height: 200
+            height: 400
             color: Qt.alpha(Colors.bg0, 0.98)
             border.color: Colors.bg2
             border.width: 1
             radius: 12
-            
-            MouseArea { 
-                anchors.fill: parent 
-            }
-            
-            focus: true
-            Keys.onEscapePressed: { 
-                btPopupWindow.visible = false 
-            }
-            onVisibleChanged: { 
-                if (visible) {
-                    forceActiveFocus()
-                }
+
+            MouseArea {
+                anchors.fill: parent
             }
 
             Column {
                 anchors.fill: parent
                 anchors.margins: 15
                 spacing: 15
-                
-                // FIX: Used RowLayout to properly push icons to the right side
+
                 RowLayout {
                     width: parent.width
-                    
-                    Text { 
+                    Text {
                         Layout.fillWidth: true
                         text: "Bluetooth Devices"
                         color: Colors.fg
                         font.bold: true
                         font.pixelSize: 16
                     }
-                    
-                    Text { 
+
+                    Text {
                         text: "󰑐"
                         color: Colors.blue
                         font.pixelSize: 16
                         font.family: "JetBrainsMono Nerd Font"
-                        MouseArea { 
+                        MouseArea {
                             anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: { 
-                                refreshBt.running = true 
-                            } 
-                        } 
+                            onClicked: refreshStatus.running = true
+                        }
                     }
-                    
+
                     Rectangle {
                         width: 36
                         height: 18
                         radius: 9
                         color: btRoot.isBtOn ? Colors.aqua : Colors.bg3
-                        Rectangle { 
+                        Rectangle {
                             x: btRoot.isBtOn ? 18 : 2
                             anchors.verticalCenter: parent.verticalCenter
                             width: 14
                             height: 14
                             radius: 7
                             color: Colors.bg0
-                            Behavior on x { 
-                                NumberAnimation { 
-                                    duration: 150 
-                                } 
-                            } 
+                            Behavior on x {
+                                NumberAnimation {
+                                    duration: 150
+                                }
+                            }
                         }
-                        MouseArea { 
+                        MouseArea {
                             anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: { 
-                                btRoot.isBtOn = !btRoot.isBtOn
-                                Quickshell.execDetached([
-                                    "bluetoothctl", 
-                                    "power", 
-                                    btRoot.isBtOn ? "on" : "off"
-                                ]) 
-                            } 
+                            onClicked: {
+                                Quickshell.execDetached(["bluetoothctl", "power", btRoot.isBtOn ? "off" : "on"]);
+                                btRoot.isBtOn = !btRoot.isBtOn;
+                            }
                         }
                     }
                 }
-                
-                Rectangle { 
+
+                Rectangle {
                     width: parent.width
                     height: 1
-                    color: Colors.bg2 
+                    color: Colors.bg2
                 }
-                
+
                 ListView {
                     width: parent.width
-                    height: 320
+                    height: 280
                     clip: true
-                    spacing: 6
+                    spacing: 8
                     model: btModel
                     delegate: Rectangle {
-                        width: ListView.view ? ListView.view.width : 290
-                        height: 35
-                        radius: 6
-                        color: model.connected ? Colors.bg2 : "transparent"
-                        Text { 
+                        width: 290
+                        height: 40
+                        radius: 8
+                        color: model.connected ? Qt.alpha(Colors.aqua, 0.1) : "transparent"
+                        Text {
                             anchors.left: parent.left
                             anchors.leftMargin: 10
                             anchors.verticalCenter: parent.verticalCenter
                             text: model.name
                             color: model.connected ? Colors.aqua : Colors.fg
-                            font.pixelSize: 12
-                            width: 150
-                            elide: Text.ElideRight 
+                            font.pixelSize: 13
+                            elide: Text.ElideRight
+                            width: 160
                         }
                         Rectangle {
                             anchors.right: parent.right
                             anchors.rightMargin: 10
                             anchors.verticalCenter: parent.verticalCenter
-                            width: 65
-                            height: 24
-                            radius: 4
+                            width: 85
+                            height: 26
+                            radius: 6
                             color: model.connected ? Colors.red : Colors.bg3
-                            Text { 
+                            Text {
                                 anchors.centerIn: parent
                                 text: model.connected ? "Disconnect" : "Connect"
                                 color: Colors.fg
                                 font.pixelSize: 10
-                                font.bold: true 
+                                font.bold: true
                             }
-                            MouseArea { 
+                            MouseArea {
                                 anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: { 
-                                    Quickshell.execDetached([
-                                        "bluetoothctl", 
-                                        model.connected ? "disconnect" : "connect", 
-                                        model.mac
-                                    ]) 
-                                } 
+                                onClicked: Quickshell.execDetached(["bluetoothctl", model.connected ? "disconnect" : "connect", model.mac])
                             }
                         }
                     }

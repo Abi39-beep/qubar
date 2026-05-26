@@ -6,8 +6,8 @@ PopupWindow {
     id: calendarRoot
     visible: false
     
-    width: 250
-    height: 250 // Increased by 10 to make room for the gap
+    implicitWidth: 250
+    implicitHeight: 250 // Increased by 10 to make room for the gap
     
     color: "transparent"
     grabFocus: true 

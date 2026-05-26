@@ -29,7 +29,7 @@ PanelWindow {
         { 
             name: "Lock", 
             icon: "", 
-            cmd: "loginctl lock-session", 
+            cmd: "$HOME/.config/hypr/hyprlock.sh", 
             color: Colors.blue 
         },
         { 

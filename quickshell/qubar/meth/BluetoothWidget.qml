@@ -14,10 +14,10 @@ Rectangle {
     Text {
         id: btIcon
         anchors.centerIn: parent
-        text: "󰂯"
+        text: btWidget.isBtOn ? "󰂯" : "󰂲"
         font.pixelSize: 18
         font.family: "JetBrainsMono Nerd Font"
-        color: btWidget.isBtOn ? Colors.orange : Colors.grey0
+        color: btWidget.isBtOn ? Colors.orange : Colors.grey1
     }
     MouseArea {
         id: btMouse
@@ -35,7 +35,7 @@ Rectangle {
             if (containsMouse) {
                 btIcon.color = Colors.blue;
             } else {
-                btIcon.color = btWidget.isBtOn ? Colors.orange : Colors.grey0;
+                btIcon.color = btWidget.isBtOn ? Colors.orange : Colors.grey1;
             }
         }
     }

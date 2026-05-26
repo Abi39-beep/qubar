@@ -1,13 +1,15 @@
 import QtQuick
 import Quickshell
 import Quickshell.Services.UPower
-import Quickshell.Io 
+import Quickshell.Io
 import ".."
 
 Rectangle {
     id: batteryWidget
-    width: 70; height: 30; radius: 15
-    color: Colors.bg1 
+    width: 70
+    height: 30
+    radius: 15
+    color: Colors.bg1
     border.width: 1
     border.color: Colors.bg2
 
@@ -16,7 +18,7 @@ Rectangle {
 
     // FIX: Changed from StringParser to SplitParser
     Process {
-        command:["powerprofilesctl", "get"]
+        command: ["powerprofilesctl", "get"]
         running: true
         stdout: SplitParser {
             onRead: data => {
@@ -33,19 +35,19 @@ Rectangle {
     Row {
         anchors.centerIn: parent
         spacing: 6
-        
+
         Text {
-            text: batteryWidget.isCharging ? "󰂄" : "󰁹" 
-            font.pixelSize: 15
+            text: batteryWidget.isCharging ? "󰂄" : "󰁹"
+            font.pixelSize: 13
             font.family: "JetBrainsMono Nerd Font"
-            color: Colors.fg 
+            color: Colors.aqua
         }
-        
+
         Text {
             text: `${batteryWidget.batPercent}%`
             font.pixelSize: 13
             font.family: "JetBrainsMono Nerd Font"
-            color: Colors.fg
+            color: Colors.aqua
             font.bold: true
         }
     }
@@ -60,34 +62,34 @@ Rectangle {
     // --- FLOATING POWER PROFILE POPUP ---
     PopupWindow {
         id: powerPopup
-        anchor.item: batteryWidget 
+        anchor.item: batteryWidget
         anchor.edges: Edges.Bottom | Edges.Left
-        
+
         width: 200
-        height: 120 
+        height: 120
         visible: false
-        
+
         color: "transparent"
-        grabFocus: true 
-        
+        grabFocus: true
+
         // Force keyboard grab when opened
         onVisibleChanged: {
             if (visible) {
-                powerBgRect.forceActiveFocus()
+                powerBgRect.forceActiveFocus();
             }
         }
-        
+
         Rectangle {
             id: powerBgRect
             anchors.fill: parent
-            anchors.topMargin: 10 
-            
+            anchors.topMargin: 10
+
             // Escape key & Click-away logic
             focus: true
             Keys.onEscapePressed: powerPopup.visible = false
             onActiveFocusChanged: {
                 if (!activeFocus) {
-                    powerPopup.visible = false
+                    powerPopup.visible = false;
                 }
             }
 
@@ -95,12 +97,12 @@ Rectangle {
             border.color: Colors.grey0
             border.width: 1
             radius: 8
-            
+
             Column {
                 anchors.fill: parent
                 anchors.margins: 8
                 spacing: 4
-                
+
                 Text {
                     text: "Power Profile"
                     font.pixelSize: 14
@@ -109,21 +111,32 @@ Rectangle {
                     bottomPadding: 4
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
-                
+
                 Repeater {
-                    model:[
-                        { name: "Performance ", cmd: "performance" },
-                        { name: "Balanced ", cmd: "balanced" },
-                        { name: "Power Saver ", cmd: "power-saver" }
+                    model: [
+                        {
+                            name: "Performance ",
+                            cmd: "performance"
+                        },
+                        {
+                            name: "Balanced ",
+                            cmd: "balanced"
+                        },
+                        {
+                            name: "Power Saver ",
+                            cmd: "power-saver"
+                        }
                     ]
-                    
+
                     Rectangle {
                         required property var modelData
-                        width: parent.width; height: 22; radius: 4
-                        
+                        width: parent.width
+                        height: 22
+                        radius: 4
+
                         readonly property bool isCurrent: batteryWidget.activeProfile === modelData.cmd
                         color: isCurrent ? Colors.bg3 : (btnMouse.containsMouse ? Colors.bg2 : "transparent")
-                        
+
                         Text {
                             anchors.centerIn: parent
                             text: isCurrent ? "● " + modelData.name : "  " + modelData.name
@@ -131,16 +144,16 @@ Rectangle {
                             font.pixelSize: 14
                             font.family: "JetBrainsMono Nerd Font"
                         }
-                        
+
                         MouseArea {
                             id: btnMouse
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                Quickshell.execDetached(["powerprofilesctl", "set", modelData.cmd])
-                                batteryWidget.activeProfile = modelData.cmd
-                                powerPopup.visible = false 
+                                Quickshell.execDetached(["powerprofilesctl", "set", modelData.cmd]);
+                                batteryWidget.activeProfile = modelData.cmd;
+                                powerPopup.visible = false;
                             }
                         }
                     }

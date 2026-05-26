@@ -40,7 +40,7 @@ ShellRoot {
                         anchors.centerIn: parent
                         text: Qt.formatDateTime(new Date(), "hh:mm AP")
                         color: Colors.fg
-                        font.pixelSize: 15
+                        font.pixelSize: 14
                         font.family: "JetBrainsMono Nerd Font"
                         font.bold: true
                     }
