@@ -57,7 +57,7 @@ Rectangle {
         anchor.edges: Edges.Bottom | Edges.Left
 
         width: 200
-        height: 120
+        height: 130
         visible: false
 
         color: "transparent"
@@ -72,7 +72,7 @@ Rectangle {
         Rectangle {
             id: powerBgRect
             anchors.fill: parent
-            anchors.topMargin: 10
+            anchors.topMargin: 15
 
             focus: true
             Keys.onEscapePressed: powerPopup.visible = false

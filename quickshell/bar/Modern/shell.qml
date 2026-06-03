@@ -38,7 +38,7 @@ ShellRoot {
                 // Right items (Kept in a nested Row so they keep their smaller 5px spacing)
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 3
+                    spacing: 5
 
                     WifiWidget {}
                     BluetoothWidget {}

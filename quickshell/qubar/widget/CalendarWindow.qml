@@ -5,38 +5,38 @@ import ".."
 PopupWindow {
     id: calendarRoot
     visible: false
-    
+
     width: 250
     height: 250 // Increased by 10 to make room for the gap
-    
+
     color: "transparent"
-    grabFocus: true 
+    grabFocus: true
 
     // FIX: Force it to grab the keyboard when it opens
     onVisibleChanged: {
         if (visible) {
-            bgRect.forceActiveFocus()
+            bgRect.forceActiveFocus();
         }
     }
 
     Rectangle {
         id: bgRect
         anchors.fill: parent
-        
+
         // FIX: This pushes the rectangle down, creating a 10px gap!
-        anchors.topMargin: 10 
-        
+        anchors.topMargin: 10
+
         // FIX: Listen for the Escape key and focus loss (clicking outside)
         focus: true
         Keys.onEscapePressed: calendarRoot.visible = false
         onActiveFocusChanged: {
             // If it loses focus (you clicked another window), close it
             if (!activeFocus) {
-                calendarRoot.visible = false
+                calendarRoot.visible = false;
             }
         }
 
-        color: Qt.alpha(Colors.bg0, 0.95) 
+        color: Qt.alpha(Colors.bg0, 0.95)
         border.color: Colors.bg2
         border.width: 1
         radius: 12
@@ -61,7 +61,9 @@ PopupWindow {
                 Repeater {
                     model: 31
                     Rectangle {
-                        width: 25; height: 25; radius: 4
+                        width: 25
+                        height: 25
+                        radius: 4
                         color: (index + 1 === new Date().getDate()) ? Colors.green : "transparent"
                         Text {
                             anchors.centerIn: parent

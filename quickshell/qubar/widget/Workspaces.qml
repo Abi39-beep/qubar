@@ -34,8 +34,8 @@ Rectangle {
                 readonly property bool isOccupied: ws ? ws.toplevels.values.length > 0 : false
 
                 // STYLING CHANGE: Make width expand to 60 if active, otherwise 30
-                width: isFocused ? 50 : 25
-                height: 25
+                width: isFocused ? 50 : 23
+                height: 23
                 radius: 15
 
                 // STYLING CHANGE: Add a smooth animation when the width expands/shrinks

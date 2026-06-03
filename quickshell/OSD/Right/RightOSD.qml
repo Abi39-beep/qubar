@@ -8,57 +8,57 @@ import ".."
 
 PanelWindow {
     id: rightOSDWindow
-    visible: false 
+    visible: false
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
     WlrLayershell.namespace: "rightosd"
-    
-    anchors { 
+
+    anchors {
         right: true
         top: true
         bottom: true
-        left: true 
+        left: true
     }
     color: "transparent"
 
     function toggleRight() {
-        rightOSDWindow.visible = !rightOSDWindow.visible
+        rightOSDWindow.visible = !rightOSDWindow.visible;
     }
 
     MouseArea {
         anchors.fill: parent
         hoverEnabled: true
-        onClicked: { 
-            rightOSDWindow.visible = false 
+        onClicked: {
+            rightOSDWindow.visible = false;
         }
     }
 
     Rectangle {
         id: rightBg
         width: 440
-        anchors { 
+        anchors {
             right: parent.right
             top: parent.top
-            bottom: parent.bottom 
+            bottom: parent.bottom
         }
         anchors.margins: 20
         color: Qt.alpha(Colors.bg0, 0.75)
         border.color: Colors.bg2
         border.width: 2
         radius: 15
-        
-        MouseArea { 
-            anchors.fill: parent 
-        } 
-        
-        focus: true
-        Keys.onEscapePressed: { 
-            rightOSDWindow.visible = false 
+
+        MouseArea {
+            anchors.fill: parent
         }
-        onVisibleChanged: { 
+
+        focus: true
+        Keys.onEscapePressed: {
+            rightOSDWindow.visible = false;
+        }
+        onVisibleChanged: {
             if (visible) {
-                rightBg.forceActiveFocus() 
+                rightBg.forceActiveFocus();
             }
         }
 
@@ -83,19 +83,19 @@ PanelWindow {
                         Column {
                             anchors.centerIn: parent
                             spacing: 4
-                            Text { 
+                            Text {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: modelData.icon
                                 color: modelData.color
                                 font.pixelSize: 18
-                                font.family: "JetBrainsMono Nerd Font" 
+                                font.family: "JetBrainsMono Nerd Font"
                             }
-                            Text { 
+                            Text {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: modelData.name
                                 color: Colors.fg
                                 font.pixelSize: 10
-                                font.bold: true 
+                                font.bold: true
                             }
                         }
                         MouseArea {
@@ -104,18 +104,18 @@ PanelWindow {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                rightOSDWindow.visible = false
-                                powerMenu.openMenu(index)
+                                rightOSDWindow.visible = false;
+                                powerMenu.openMenu(index);
                             }
                         }
                     }
                 }
             }
 
-            Rectangle { 
+            Rectangle {
                 width: parent.width
                 height: 1
-                color: Colors.bg2 
+                color: Colors.bg2
             }
 
             // 2. CPU, Memory, and Battery Perfectly Aligned in One Row!
@@ -134,15 +134,15 @@ PanelWindow {
                     width: (parent.width - 20) / 3
 
                     onCloseMainPanel: {
-                        rightOSDWindow.visible = false
+                        rightOSDWindow.visible = false;
                     }
                 }
             }
 
-            Rectangle { 
+            Rectangle {
                 width: parent.width
                 height: 1
-                color: Colors.bg2 
+                color: Colors.bg2
             }
 
             // 3. Network & Bluetooth
@@ -151,33 +151,33 @@ PanelWindow {
                 spacing: 15
                 Network {
                     onCloseMainPanel: {
-                        rightOSDWindow.visible = false
+                        rightOSDWindow.visible = false;
                     }
                 }
                 Bluetooth {
                     onCloseMainPanel: {
-                        rightOSDWindow.visible = false
+                        rightOSDWindow.visible = false;
                     }
                 }
             }
 
-            Rectangle { 
+            Rectangle {
                 width: parent.width
                 height: 1
-                color: Colors.bg2 
+                color: Colors.bg2
             }
 
             // 4. Templates
             Template {
                 onCloseMainPanel: {
-                    rightOSDWindow.visible = false
+                    rightOSDWindow.visible = false;
                 }
             }
 
-            Rectangle { 
+            Rectangle {
                 width: parent.width
                 height: 1
-                color: Colors.bg2 
+                color: Colors.bg2
             }
 
             property int activeTab: 0
@@ -194,30 +194,30 @@ PanelWindow {
                     color: parent.parent.activeTab === 0 ? Colors.bg2 : Colors.bg1
                     border.width: 1
                     border.color: parent.parent.activeTab === 0 ? Colors.bg3 : Colors.bg2
-                    Row { 
+                    Row {
                         anchors.centerIn: parent
                         spacing: 8
-                        Text { 
+                        Text {
                             text: "󰂚"
                             color: parent.parent.parent.parent.activeTab === 0 ? Colors.yellow : Colors.grey1
                             font.pixelSize: 14
-                            font.family: "JetBrainsMono Nerd Font" 
+                            font.family: "JetBrainsMono Nerd Font"
                             anchors.verticalCenter: parent.verticalCenter
                         }
-                        Text { 
+                        Text {
                             text: "Notifications"
                             color: Colors.fg
                             font.bold: true
-                            font.pixelSize: 13 
+                            font.pixelSize: 13
                             anchors.verticalCenter: parent.verticalCenter
                         }
                     }
-                    MouseArea { 
+                    MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: { 
-                            parent.parent.parent.activeTab = 0 
-                        } 
+                        onClicked: {
+                            parent.parent.parent.activeTab = 0;
+                        }
                     }
                 }
                 Rectangle {
@@ -227,30 +227,30 @@ PanelWindow {
                     color: parent.parent.activeTab === 1 ? Colors.bg2 : Colors.bg1
                     border.width: 1
                     border.color: parent.parent.activeTab === 1 ? Colors.bg3 : Colors.bg2
-                    Row { 
+                    Row {
                         anchors.centerIn: parent
                         spacing: 8
-                        Text { 
+                        Text {
                             text: "󰅌"
                             color: parent.parent.parent.parent.activeTab === 1 ? Colors.orange : Colors.grey1
                             font.pixelSize: 14
-                            font.family: "JetBrainsMono Nerd Font" 
+                            font.family: "JetBrainsMono Nerd Font"
                             anchors.verticalCenter: parent.verticalCenter
                         }
-                        Text { 
+                        Text {
                             text: "Clipboard"
                             color: Colors.fg
                             font.bold: true
-                            font.pixelSize: 13 
+                            font.pixelSize: 13
                             anchors.verticalCenter: parent.verticalCenter
                         }
                     }
-                    MouseArea { 
+                    MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: { 
-                            parent.parent.parent.activeTab = 1
-                        } 
+                        onClicked: {
+                            parent.parent.parent.activeTab = 1;
+                        }
                     }
                 }
             }
@@ -259,11 +259,11 @@ PanelWindow {
             Item {
                 width: parent.width
                 height: parent.parent.height - y - 25
-                
+
                 Notification {
                     visible: parent.parent.activeTab === 0
                 }
-                
+
                 Clipboard {
                     visible: parent.parent.activeTab === 1
                 }

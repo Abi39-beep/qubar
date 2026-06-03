@@ -6,7 +6,7 @@ Rectangle {
     id: clockPill
     // Automatically adjust width based on the content
     width: clockRow.width + 15
-    height: 30
+    height: 28
     radius: 15
     color: Colors.bg1
     border.color: Colors.bg2
@@ -22,14 +22,15 @@ Rectangle {
             id: timeDisplay
             text: Qt.formatDateTime(new Date(), "hh:mm AP")
             color: Colors.fg
-            font.pixelSize: 15
+            font.pixelSize: 14
             font.family: "JetBrainsMono Nerd Font"
             font.bold: true
         }
 
         // Separator Line
         Rectangle {
-            width: 1; height: 14
+            width: 1
+            height: 14
             color: Colors.bg4
             anchors.verticalCenter: parent.verticalCenter
         }
@@ -46,7 +47,9 @@ Rectangle {
 
     // This updates both the time and the date every second
     Timer {
-        interval: 1000; running: true; repeat: true
+        interval: 1000
+        running: true
+        repeat: true
         onTriggered: {
             var now = new Date();
             timeDisplay.text = Qt.formatDateTime(now, "hh:mm AP");
