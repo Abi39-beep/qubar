@@ -16,6 +16,8 @@ ShellRoot {
         Rectangle {
             anchors.fill: parent
             color: Qt.alpha(Colors.bg0, 0.95)
+            bottomLeftRadius: 8
+            bottomRightRadius: 8
 
             Row {
                 anchors.left: parent.left

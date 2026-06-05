@@ -27,11 +27,15 @@ ShellRoot {
     }
 
     OsdWorkspace {
-        id:topOsd
+        id: topOsd
     }
 
     DesktopClock {
         id: clock
+    }
+
+    Clook {
+        id: clook
     }
 
     GlobalShortcut {
