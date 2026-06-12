@@ -16,7 +16,6 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Top
 
-    // ADDED STATE 4: Allow keyboard focus for the Power Menu so Esc works!
     WlrLayershell.keyboardFocus: (pillWindow.viewState === 1 || pillWindow.viewState === 3 || pillWindow.viewState === 4) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     implicitWidth: 600
@@ -24,9 +23,15 @@ PanelWindow {
 
     property int viewState: 0
 
+    // --- THE BASH FOCUS FIX ---
+    // Zero background polling, zero QML tracking. Just a raw, delayed terminal command
+    // that safely grabs the active window and forces Hyprland to focus it.
     onViewStateChanged: {
         if (viewState === 1 || viewState === 3 || viewState === 4) {
             pill.forceActiveFocus();
+        } else if (viewState === 0) {
+            pill.focus = false;
+            Quickshell.execDetached(["bash", "-c", "sleep 0.1 && ADDR=$(hyprctl activewindow | awk 'NR==1 {print $2}'); if [[ \"$ADDR\" != \"\" && \"$ADDR\" != \"Invalid\" ]]; then hyprctl dispatch focuswindow address:0x$ADDR; fi"]);
         }
     }
 
@@ -169,15 +174,30 @@ PanelWindow {
         y: pillWindow.isVisible ? Config.topMargin : -(height + Config.topMargin)
 
         focus: true
+
         Keys.onEscapePressed: {
-            if (pillWindow.viewState === 3) {
+            if (pillWindow.viewState === 3)
                 pillWindow.viewState = 1;
-            } else if (pillWindow.viewState === 1 || pillWindow.viewState === 4) { // ADDED STATE 4: Esc key closes it
+            else if (pillWindow.viewState === 1 || pillWindow.viewState === 4)
                 pillWindow.viewState = 0;
-            }
+        }
+        Keys.onLeftPressed: {
+            if (pillWindow.viewState === 4)
+                powerMenu.moveLeft();
+        }
+        Keys.onRightPressed: {
+            if (pillWindow.viewState === 4)
+                powerMenu.moveRight();
+        }
+        Keys.onReturnPressed: {
+            if (pillWindow.viewState === 4)
+                powerMenu.executeSelected();
+        }
+        Keys.onEnterPressed: {
+            if (pillWindow.viewState === 4)
+                powerMenu.executeSelected();
         }
 
-        // ADDED STATE 4: Height Logic
         height: {
             if (pillWindow.viewState === 1)
                 return Config.expandedHeight;
@@ -188,12 +208,11 @@ PanelWindow {
             return Config.pillHeight;
         }
 
-        // ADDED STATE 4: Radius Logic
         radius: {
             if (pillWindow.viewState === 3)
                 return Config.mediaCtrlRadius;
             if (pillWindow.viewState === 4)
-                return Config.powerMenuHeight / 2; // Keeps the power menu rounded
+                return Config.powerMenuHeight / 2;
             return height / 2;
         }
 
@@ -202,7 +221,6 @@ PanelWindow {
         border.width: 2
         clip: true
 
-        // ADDED STATE 4: Width Logic
         width: {
             if (pillWindow.viewState === 0)
                 return pillWindow.isMediaPlaying ? Config.timeWithEqWidth : Config.timeWidth;
@@ -417,8 +435,8 @@ PanelWindow {
             onCloseRequested: pillWindow.viewState = 1
         }
 
-        // --- ADDED STATE 4: Power Menu Content ---
         PowerMenu {
+            id: powerMenu
             anchors.fill: parent
             opacity: pillWindow.viewState === 4 ? 1 : 0
             visible: opacity > 0

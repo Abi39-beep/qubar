@@ -48,6 +48,12 @@ QtObject {
     readonly property real mediaCtrlTintOpacity: 0.70
 
     // --- Power Menu Settings ---
-    readonly property int powerMenuWidth: 420
-    readonly property int powerMenuHeight: 100
+    readonly property int powerMenuWidth: 350
+    readonly property int powerMenuHeight: 70
+    readonly property int powerMenuBoxSize: 50
+    readonly property int powerMenuBoxRadius: 12
+    readonly property int powerMenuSpacing: 12
+    readonly property int powerMenuIconSize: 20
+    readonly property int powerMenuCountdownSize: 20
+    readonly property int powerMenuBorderWidth: 2
 }
