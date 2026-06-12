@@ -1,35 +1,93 @@
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.UPower
 import QtQuick
 
 Rectangle {
     id: sysPill
-    anchors.verticalCenter: parent.verticalCenter
+
+    visible: Config.showWifi || Config.showBattery
+
     width: sysContent.width + 24
     height: 32
     radius: 16
     color: Colors.bg2
 
-    property int batLevel: 100
-    property string batStatus: "Discharging"
+    // --- 1. NATIVE BATTERY LOGIC ---
+    readonly property int batLevel: UPower.displayDevice?.ready ? Math.round(UPower.displayDevice.percentage * 100) : 0
+    readonly property bool isPluggedIn: !UPower.onBattery
+
+    // --- 2. SMART NETWORK LOGIC ---
+    property string netType: "none" // "wifi", "wired", or "none"
     property int wifiLevel: 0
 
-    Process {
-        id: sysInfoChecker
-        command: ["bash", "$HOME/.config/quickshell/tact/sys_info.sh"]
-        running: true
+    Timer {
+        interval: 3000
+        running: Config.showWifi
+        repeat: true
+        onTriggered: {
+            // Only trigger if the process isn't already running
+            if (!netProcess.running) {
+                netProcess.running = true;
+            }
+        }
+    }
 
-        onStdoutChanged: {
-            let rawString = stdout.trim();
-            if (rawString === "")
+    Process {
+        id: netProcess
+        running: Config.showWifi
+
+        command: ["bash", "-c", "nmcli -t -f TYPE,STATE dev; echo '---'; nmcli -t -f IN-USE,SIGNAL dev wifi 2>/dev/null"]
+
+        // THE FIX: Properly using Quickshell's IO Parser
+        property string fullOutput: ""
+
+        stdout: SplitParser {
+            onRead: data => {
+                netProcess.fullOutput += data + "\n";
+            }
+        }
+
+        onExited: {
+            let raw = fullOutput.trim();
+            fullOutput = ""; // MUST reset for the next timer loop!
+
+            if (raw === "")
                 return;
-            let lines = rawString.split('\n');
-            let lastLine = lines[lines.length - 1].trim();
-            let parts = lastLine.split('|');
-            if (parts.length === 3) {
-                sysPill.batLevel = parseInt(parts[0]);
-                sysPill.batStatus = parts[1];
-                sysPill.wifiLevel = parseInt(parts[2]);
+
+            let sections = raw.split("---\n");
+            if (sections.length >= 2) {
+                let devState = sections[0];
+                let wifiState = sections[1];
+
+                // 1. Check for Wired Connection
+                if (devState.includes("ethernet:connected")) {
+                    sysPill.netType = "wired";
+                    sysPill.wifiLevel = 0;
+                } else
+                // 2. Check for Wi-Fi Connection
+                if (devState.includes("wifi:connected")) {
+                    sysPill.netType = "wifi";
+
+                    let lines = wifiState.split("\n");
+                    let sig = 0;
+
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].startsWith("*")) {
+                            let parts = lines[i].split(":");
+                            if (parts.length >= 2) {
+                                sig = parseInt(parts[1]);
+                            }
+                            break;
+                        }
+                    }
+                    sysPill.wifiLevel = isNaN(sig) ? 0 : sig;
+                } else
+                // 3. Disconnected
+                {
+                    sysPill.netType = "none";
+                    sysPill.wifiLevel = 0;
+                }
             }
         }
     }
@@ -39,117 +97,183 @@ Rectangle {
         anchors.centerIn: parent
         spacing: 12
 
-        // 1. Wi-Fi Arc (Radar) Icon using Canvas drawing
-        Canvas {
-            id: wifiCanvas
-            width: 20
-            height: 18
+        // --- Network Icons Container ---
+        Item {
+            width: 18
+            height: 16
             anchors.verticalCenter: parent.verticalCenter
-            antialiasing: true
+            visible: Config.showWifi
 
-            // Triggers a redraw if the wifi level changes
-            onPaint: {
-                var ctx = getContext("2d");
-                ctx.clearRect(0, 0, width, height);
-                ctx.lineWidth = 2.5;
-                ctx.lineCap = "round";
+            // Icon A: Wi-Fi Radar
+            Canvas {
+                id: wifiCanvas
+                anchors.fill: parent
+                visible: sysPill.netType === "wifi" || sysPill.netType === "none"
+                antialiasing: true
 
-                var cx = width / 2;
-                var cy = height - 2; // Bottom origin point
+                onPaint: {
+                    var ctx = getContext("2d");
+                    ctx.reset();
+                    ctx.clearRect(0, 0, width, height);
+                    ctx.lineWidth = 2.0;
+                    ctx.lineCap = "round";
 
-                // Helper to draw arcs based on level
-                function drawArc(r, active) {
+                    var cx = width / 2;
+                    var cy = height - 2;
+
+                    function drawArc(r, active) {
+                        if (!active)
+                            return;
+                        ctx.beginPath();
+                        ctx.strokeStyle = Colors.fg0;
+                        ctx.arc(cx, cy, r, Math.PI * 1.25, Math.PI * 1.75);
+                        ctx.stroke();
+                    }
+
+                    // Base Dot (Dimmed to Colors.fg3 if offline)
                     ctx.beginPath();
-                    ctx.strokeStyle = active ? Colors.fg0 : Colors.bg3;
-                    // Angles to draw a top-facing pie slice
-                    ctx.arc(cx, cy, r, Math.PI * 1.25, Math.PI * 1.75);
-                    ctx.stroke();
+                    ctx.fillStyle = sysPill.netType === "wifi" && sysPill.wifiLevel > 0 ? Colors.fg0 : Colors.fg3;
+                    ctx.arc(cx, cy, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Draws arcs based on nmcli's native 0-100% signal
+                    if (sysPill.netType === "wifi" && sysPill.wifiLevel > 0) {
+                        drawArc(5, sysPill.wifiLevel > 25);
+                        drawArc(9, sysPill.wifiLevel > 50);
+                        drawArc(13, sysPill.wifiLevel > 75);
+                    }
                 }
 
-                // Center Dot
-                ctx.beginPath();
-                ctx.fillStyle = sysPill.wifiLevel > 5 ? Colors.fg0 : Colors.bg3;
-                ctx.arc(cx, cy, 1.5, 0, Math.PI * 2);
-                ctx.fill();
-
-                // Draw the 3 arcs
-                drawArc(5, sysPill.wifiLevel > 30);
-                drawArc(9, sysPill.wifiLevel > 60);
-                drawArc(13, sysPill.wifiLevel > 90);
+                Connections {
+                    target: sysPill
+                    function onWifiLevelChanged() {
+                        wifiCanvas.requestPaint();
+                    }
+                    function onNetTypeChanged() {
+                        wifiCanvas.requestPaint();
+                    }
+                }
             }
 
-            // Force repaint when variables change
-            Connections {
-                target: sysPill
-                function onWifiLevelChanged() {
-                    wifiCanvas.requestPaint();
+            // Icon B: Wired Ethernet Tree
+            Canvas {
+                id: wiredCanvas
+                anchors.fill: parent
+                visible: sysPill.netType === "wired"
+                antialiasing: true
+
+                onPaint: {
+                    var ctx = getContext("2d");
+                    ctx.reset();
+                    ctx.clearRect(0, 0, width, height);
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeStyle = Colors.fg0;
+                    ctx.fillStyle = Colors.fg0;
+
+                    // Top dot
+                    ctx.beginPath();
+                    ctx.arc(9, 2, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Vertical drop
+                    ctx.beginPath();
+                    ctx.moveTo(9, 3);
+                    ctx.lineTo(9, 7);
+                    ctx.stroke();
+                    // Horizontal bar
+                    ctx.beginPath();
+                    ctx.moveTo(4, 7);
+                    ctx.lineTo(14, 7);
+                    ctx.stroke();
+
+                    // 3 Vertical branches
+                    ctx.beginPath();
+                    ctx.moveTo(4, 7);
+                    ctx.lineTo(4, 11);
+                    ctx.moveTo(9, 7);
+                    ctx.lineTo(9, 11);
+                    ctx.moveTo(14, 7);
+                    ctx.lineTo(14, 11);
+                    ctx.stroke();
+
+                    // 3 Bottom dots
+                    ctx.beginPath();
+                    ctx.arc(4, 12, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(9, 12, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(14, 12, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                Connections {
+                    target: sysPill
+                    function onNetTypeChanged() {
+                        wiredCanvas.requestPaint();
+                    }
                 }
             }
         }
 
-        // 2. Battery Icon with Text
+        // --- Battery Icon ---
         Row {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 2
+            visible: Config.showBattery
 
-            // Battery Shell (Widened to fit text)
             Rectangle {
-                width: 34
-                height: 18
-                radius: 4
+                width: typeof Config.batteryWidth !== "undefined" ? Config.batteryWidth : 30
+                height: 14
+                radius: 3
                 color: "transparent"
                 border.color: Colors.fg3
                 border.width: 1.5
 
-                // Battery Fill
                 Rectangle {
                     anchors.left: parent.left
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
-                    anchors.margins: 2
-                    radius: 2
-                    width: Math.max(0, (parent.width - 4) * (sysPill.batLevel / 100))
-                    color: sysPill.batStatus === "Charging" ? Colors.aqua : (sysPill.batLevel <= 20 ? "#ff5c5c" : Colors.fg0)
+                    anchors.margins: 1.5
+                    radius: 1.5
+                    width: Math.max(0, (parent.width - 3) * (sysPill.batLevel / 100))
+
+                    color: sysPill.isPluggedIn ? Colors.aqua : Colors.aqua
 
                     SequentialAnimation on opacity {
-                        running: sysPill.batStatus === "Charging"
+                        running: sysPill.isPluggedIn
                         loops: Animation.Infinite
                         NumberAnimation {
-                            from: 0.5
+                            from: 0.6
                             to: 1.0
-                            duration: 1000
+                            duration: 1200
                             easing.type: Easing.InOutQuad
                         }
                         NumberAnimation {
                             from: 1.0
-                            to: 0.5
-                            duration: 1000
+                            to: 0.6
+                            duration: 1200
                             easing.type: Easing.InOutQuad
                         }
                     }
                 }
 
-                // Battery Text (Percentage + Lightning)
                 Text {
                     anchors.centerIn: parent
-                    // Adds the lightning bolt only if charging
-                    text: (sysPill.batStatus === "Charging" ? "⚡ " : "") + sysPill.batLevel
+                    text: (sysPill.isPluggedIn ? "⚡ " : "") + sysPill.batLevel
                     font.family: Config.fontName
-                    font.pixelSize: 10
+                    font.pixelSize: 9
                     font.bold: true
 
-                    // Smart Contrast: Dark text with a light outline so it's ALWAYS readable
                     color: Colors.bg0
                     style: Text.Outline
-                    styleColor: Colors.fg0
-                    z: 2 // Keeps text above the fill
+                    styleColor: sysPill.isPluggedIn ? Colors.aqua : Colors.aqua
+                    z: 2
                 }
             }
-
-            // Battery Tip
             Rectangle {
                 width: 2
-                height: 8
+                height: 6
                 radius: 1
                 color: Colors.fg3
                 anchors.verticalCenter: parent.verticalCenter

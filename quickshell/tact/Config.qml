@@ -34,4 +34,20 @@ QtObject {
     readonly property int expandedHeight: 59
     readonly property int expandedWidth: 480
     readonly property int dashboardSpacing: 24 // Adjust this number to control the gap!
+
+    // --- System Pill ---
+    readonly property bool showWifi: true
+    readonly property bool showBattery: true
+    readonly property int batteryWidth: 30 // Adjust this to make the battery longer or shorter!
+
+    // --- Media Controller Settings ---
+    readonly property int mediaCtrlWidth: 400
+    readonly property int mediaCtrlHeight: 120
+    readonly property int mediaCtrlRadius: 24
+    readonly property real mediaCtrlArtOpacity: 0.85
+    readonly property real mediaCtrlTintOpacity: 0.70
+
+    // --- Power Menu Settings ---
+    readonly property int powerMenuWidth: 420
+    readonly property int powerMenuHeight: 100
 }

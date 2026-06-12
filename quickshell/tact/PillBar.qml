@@ -16,10 +16,20 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Top
 
+    // ADDED STATE 4: Allow keyboard focus for the Power Menu so Esc works!
+    WlrLayershell.keyboardFocus: (pillWindow.viewState === 1 || pillWindow.viewState === 3 || pillWindow.viewState === 4) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+
     implicitWidth: 600
-    implicitHeight: Config.expandedHeight + (Config.topMargin * 2)
+    implicitHeight: Math.max(Config.expandedHeight, Config.mediaCtrlHeight + 50) + (Config.topMargin * 2)
 
     property int viewState: 0
+
+    onViewStateChanged: {
+        if (viewState === 1 || viewState === 3 || viewState === 4) {
+            pill.forceActiveFocus();
+        }
+    }
+
     property var activeWorkspaces: []
     property bool hasWindows: false
 
@@ -76,7 +86,7 @@ PanelWindow {
     }
 
     property bool isHoverTriggered: false
-    property bool isVisible: !hasWindows || isHoverTriggered || viewState === 2 || viewState === 1
+    property bool isVisible: !hasWindows || isHoverTriggered || viewState === 2 || viewState === 1 || viewState === 3 || viewState === 4
 
     function refreshWorkspaces() {
         var rawWorkspaces = Hyprland.workspaces.values;
@@ -118,16 +128,19 @@ PanelWindow {
     Component.onCompleted: {
         refreshWorkspaces();
     }
+
     Timer {
         id: workspaceTimer
         interval: 2500
         onTriggered: if (pillWindow.viewState === 2)
             pillWindow.viewState = 0
     }
+
     SystemClock {
         id: time
         precision: SystemClock.Seconds
     }
+
     Timer {
         id: hideTimer
         interval: 3000
@@ -154,25 +167,57 @@ PanelWindow {
         id: pill
         anchors.horizontalCenter: parent.horizontalCenter
         y: pillWindow.isVisible ? Config.topMargin : -(height + Config.topMargin)
-        height: pillWindow.viewState === 1 ? Config.expandedHeight : Config.pillHeight
-        radius: height / 2
+
+        focus: true
+        Keys.onEscapePressed: {
+            if (pillWindow.viewState === 3) {
+                pillWindow.viewState = 1;
+            } else if (pillWindow.viewState === 1 || pillWindow.viewState === 4) { // ADDED STATE 4: Esc key closes it
+                pillWindow.viewState = 0;
+            }
+        }
+
+        // ADDED STATE 4: Height Logic
+        height: {
+            if (pillWindow.viewState === 1)
+                return Config.expandedHeight;
+            if (pillWindow.viewState === 3)
+                return Config.mediaCtrlHeight;
+            if (pillWindow.viewState === 4)
+                return Config.powerMenuHeight;
+            return Config.pillHeight;
+        }
+
+        // ADDED STATE 4: Radius Logic
+        radius: {
+            if (pillWindow.viewState === 3)
+                return Config.mediaCtrlRadius;
+            if (pillWindow.viewState === 4)
+                return Config.powerMenuHeight / 2; // Keeps the power menu rounded
+            return height / 2;
+        }
 
         color: Colors.bg1
         border.color: Colors.bg2
         border.width: 2
         clip: true
 
+        // ADDED STATE 4: Width Logic
         width: {
             if (pillWindow.viewState === 0)
                 return pillWindow.isMediaPlaying ? Config.timeWithEqWidth : Config.timeWidth;
             if (pillWindow.viewState === 1)
-                return pillWindow.isMediaPlaying ? Config.expandedWidth : Config.timeWidth + sysPill.width + Config.dashboardSpacing;
+                return pillWindow.isMediaPlaying ? Config.expandedWidth : Config.timeWidth + sysPill.width + 48;
             if (pillWindow.viewState === 2) {
                 let count = pillWindow.activeWorkspaces.length;
                 if (count === 0)
                     return Config.timeWidth;
                 return Math.max((count * 24) + ((count - 1) * 8) + 40, Config.timeWidth);
             }
+            if (pillWindow.viewState === 3)
+                return Config.mediaCtrlWidth;
+            if (pillWindow.viewState === 4)
+                return Config.powerMenuWidth;
             return Config.timeWidth;
         }
 
@@ -194,6 +239,12 @@ PanelWindow {
                 easing.type: Config.animEasing
             }
         }
+        Behavior on radius {
+            NumberAnimation {
+                duration: Config.animDuration
+                easing.type: Config.animEasing
+            }
+        }
 
         MouseArea {
             anchors.fill: parent
@@ -202,16 +253,20 @@ PanelWindow {
                 hideTimer.stop()
             onExited: if (pillWindow.hasWindows)
                 hideTimer.restart()
-            onClicked: viewState = (pillWindow.viewState === 2) ? 1 : ((pillWindow.viewState === 0) ? 1 : 0)
+            onClicked: {
+                if (pillWindow.viewState === 3 || pillWindow.viewState === 4)
+                    pillWindow.viewState = 1;
+                else
+                    viewState = (pillWindow.viewState === 2) ? 1 : ((pillWindow.viewState === 0) ? 1 : 0);
+            }
         }
 
         // === CONTENT VIEWS ===
-
-        // State 0: Time Only
         Row {
             anchors.centerIn: parent
             spacing: 12
             opacity: pillWindow.viewState === 0 ? 1 : 0
+            visible: opacity > 0
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
@@ -233,51 +288,62 @@ PanelWindow {
             }
         }
 
-        // State 1: Expanded Dashboard
-        Row {
-            anchors.centerIn: parent
-            spacing: Config.dashboardSpacing
+        Item {
+            anchors.fill: parent
+            anchors.leftMargin: 24
+            anchors.rightMargin: 16
             opacity: pillWindow.viewState === 1 ? 1 : 0
+            visible: opacity > 0
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
                 }
             }
 
-            // Left Side: Equalizer and Title
-            Row {
+            Item {
+                anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 10
+                width: eqIcon.width + 10 + mediaTitleText.width
+                height: 40
                 visible: pillWindow.isMediaPlaying
 
-                // FIXED: Removed the ID to stop breaking your Equalizer's internal bindings!
-                Equalizer {
+                Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    isPlaying: pillWindow.isMediaPlaying
-                }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: Colors.fg2
-                    font.family: Config.fontName
-                    font.pixelSize: Config.fontSizeMediaTitle
-                    text: (Mpris.players.values.length > 0 && Mpris.players.values[0].metadata) ? (Mpris.players.values[0].metadata["xesam:title"] || "") : ""
+                    spacing: 10
 
-                    // THE FIX: Added an outer padding reserve to the math!
-                    width: {
-                        let outerPadding = 56; // Reserves 28px of empty space on both the left and right sides
-                        let internalSpacing = 10; // Space between EQ and Title
-                        let availableSpace = Config.expandedWidth - 24 - timeDateCol.width - sysPill.width - (Config.dashboardSpacing * 2) - internalSpacing - outerPadding;
-                        return Math.max(50, availableSpace);
+                    Equalizer {
+                        id: eqIcon
+                        anchors.verticalCenter: parent.verticalCenter
+                        isPlaying: pillWindow.isMediaPlaying
                     }
-                    elide: Text.ElideRight
+
+                    Text {
+                        id: mediaTitleText
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: Colors.fg2
+                        font.family: Config.fontName
+                        font.pixelSize: Config.fontSizeMediaTitle
+                        text: (Mpris.players.values.length > 0 && Mpris.players.values[0].metadata) ? (Mpris.players.values[0].metadata["xesam:title"] || "") : ""
+                        width: Math.min(implicitWidth, (pill.width / 2) - timeDateCol.width / 2 - eqIcon.width - 40)
+                        elide: Text.ElideRight
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        pillWindow.viewState = 3;
+                    }
                 }
             }
 
-            // Center Side: Time Stacked Over Date
             Column {
                 id: timeDateCol
                 anchors.verticalCenter: parent.verticalCenter
+                x: pillWindow.isMediaPlaying ? (parent.width / 2) - (width / 2) : 0
                 spacing: 0
+
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     color: Colors.fg0
@@ -296,18 +362,19 @@ PanelWindow {
                 }
             }
 
-            // Right Side: Imported System Pill Component
             SystemPill {
                 id: sysPill
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
             }
         }
 
-        // State 2: Workspaces
         Row {
             id: workspaceRow
             anchors.centerIn: parent
             spacing: 8
             opacity: pillWindow.viewState === 2 ? 1 : 0
+            visible: opacity > 0
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
@@ -335,5 +402,37 @@ PanelWindow {
                 }
             }
         }
+
+        MediaController {
+            id: mediaCtrl
+            anchors.fill: parent
+            opacity: pillWindow.viewState === 3 ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 200
+                }
+            }
+
+            onCloseRequested: pillWindow.viewState = 1
+        }
+
+        // --- ADDED STATE 4: Power Menu Content ---
+        PowerMenu {
+            anchors.fill: parent
+            opacity: pillWindow.viewState === 4 ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 200
+                }
+            }
+
+            onCloseRequested: pillWindow.viewState = 0
+        }
+    }
+
+    Keybinds {
+        target: pillWindow
     }
 }
