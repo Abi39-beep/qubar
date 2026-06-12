@@ -56,4 +56,9 @@ QtObject {
     readonly property int powerMenuIconSize: 20
     readonly property int powerMenuCountdownSize: 20
     readonly property int powerMenuBorderWidth: 2
+
+    // --- App Launcher Settings ---
+    readonly property int launcherWidth: 500
+    readonly property int launcherHeight: 450
+    readonly property int launcherRadius: 24
 }

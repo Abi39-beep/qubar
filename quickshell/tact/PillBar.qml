@@ -16,18 +16,28 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Top
 
-    WlrLayershell.keyboardFocus: (pillWindow.viewState === 1 || pillWindow.viewState === 3 || pillWindow.viewState === 4) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: (pillWindow.viewState === 1 || pillWindow.viewState === 3 || pillWindow.viewState === 4 || pillWindow.viewState === 5) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-    implicitWidth: 600
-    implicitHeight: Math.max(Config.expandedHeight, Config.mediaCtrlHeight + 50) + (Config.topMargin * 2)
+    // --- THE ULTIMATE WAYLAND MASK FIX ---
+    // We permanently lock the Wayland surface to a massive, static size.
+    // This absolutely destroys all jitter/stutter because Hyprland never has to resize the window!
+    implicitWidth: Math.max(Config.expandedWidth, Config.launcherWidth, Config.powerMenuWidth, 600) + 50
+    implicitHeight: Math.max(Config.expandedHeight, 600, Config.powerMenuHeight, Config.mediaCtrlHeight) + (Config.topMargin * 2) + 50
+
+    // Quickshell's click-through secret weapon. It tells Wayland that ONLY the
+    // dynamically morphing pill (and the tiny hover trigger zone) can be clicked.
+    // Every other pixel of this massive window becomes 100% invisible to your mouse!
+    mask: Region {
+        item: pill
+        Region {
+            item: triggerZone
+        }
+    }
 
     property int viewState: 0
 
-    // --- THE BASH FOCUS FIX ---
-    // Zero background polling, zero QML tracking. Just a raw, delayed terminal command
-    // that safely grabs the active window and forces Hyprland to focus it.
     onViewStateChanged: {
-        if (viewState === 1 || viewState === 3 || viewState === 4) {
+        if (viewState === 1 || viewState === 3 || viewState === 4 || viewState === 5) {
             pill.forceActiveFocus();
         } else if (viewState === 0) {
             pill.focus = false;
@@ -91,7 +101,7 @@ PanelWindow {
     }
 
     property bool isHoverTriggered: false
-    property bool isVisible: !hasWindows || isHoverTriggered || viewState === 2 || viewState === 1 || viewState === 3 || viewState === 4
+    property bool isVisible: !hasWindows || isHoverTriggered || viewState === 2 || viewState === 1 || viewState === 3 || viewState === 4 || viewState === 5
 
     function refreshWorkspaces() {
         var rawWorkspaces = Hyprland.workspaces.values;
@@ -174,11 +184,15 @@ PanelWindow {
         y: pillWindow.isVisible ? Config.topMargin : -(height + Config.topMargin)
 
         focus: true
+        clip: true
+        color: Colors.bg1
+        border.color: Colors.bg2
+        border.width: 2
 
         Keys.onEscapePressed: {
             if (pillWindow.viewState === 3)
                 pillWindow.viewState = 1;
-            else if (pillWindow.viewState === 1 || pillWindow.viewState === 4)
+            else if (pillWindow.viewState === 1 || pillWindow.viewState === 4 || pillWindow.viewState === 5)
                 pillWindow.viewState = 0;
         }
         Keys.onLeftPressed: {
@@ -198,29 +212,6 @@ PanelWindow {
                 powerMenu.executeSelected();
         }
 
-        height: {
-            if (pillWindow.viewState === 1)
-                return Config.expandedHeight;
-            if (pillWindow.viewState === 3)
-                return Config.mediaCtrlHeight;
-            if (pillWindow.viewState === 4)
-                return Config.powerMenuHeight;
-            return Config.pillHeight;
-        }
-
-        radius: {
-            if (pillWindow.viewState === 3)
-                return Config.mediaCtrlRadius;
-            if (pillWindow.viewState === 4)
-                return Config.powerMenuHeight / 2;
-            return height / 2;
-        }
-
-        color: Colors.bg1
-        border.color: Colors.bg2
-        border.width: 2
-        clip: true
-
         width: {
             if (pillWindow.viewState === 0)
                 return pillWindow.isMediaPlaying ? Config.timeWithEqWidth : Config.timeWidth;
@@ -236,7 +227,31 @@ PanelWindow {
                 return Config.mediaCtrlWidth;
             if (pillWindow.viewState === 4)
                 return Config.powerMenuWidth;
+            if (pillWindow.viewState === 5)
+                return Config.launcherWidth;
             return Config.timeWidth;
+        }
+
+        height: {
+            if (pillWindow.viewState === 1)
+                return Config.expandedHeight;
+            if (pillWindow.viewState === 3)
+                return Config.mediaCtrlHeight;
+            if (pillWindow.viewState === 4)
+                return Config.powerMenuHeight;
+            if (pillWindow.viewState === 5)
+                return appLauncher.dynamicHeight; // <--- The magic link!
+            return Config.pillHeight;
+        }
+
+        radius: {
+            if (pillWindow.viewState === 3)
+                return Config.mediaCtrlRadius;
+            if (pillWindow.viewState === 4)
+                return Config.powerMenuHeight / 2;
+            if (pillWindow.viewState === 5)
+                return Config.launcherRadius;
+            return height / 2;
         }
 
         Behavior on width {
@@ -272,7 +287,7 @@ PanelWindow {
             onExited: if (pillWindow.hasWindows)
                 hideTimer.restart()
             onClicked: {
-                if (pillWindow.viewState === 3 || pillWindow.viewState === 4)
+                if (pillWindow.viewState === 3 || pillWindow.viewState === 4 || pillWindow.viewState === 5)
                     pillWindow.viewState = 1;
                 else
                     viewState = (pillWindow.viewState === 2) ? 1 : ((pillWindow.viewState === 0) ? 1 : 0);
@@ -350,9 +365,7 @@ PanelWindow {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        pillWindow.viewState = 3;
-                    }
+                    onClicked: pillWindow.viewState = 3
                 }
             }
 
@@ -439,6 +452,24 @@ PanelWindow {
             id: powerMenu
             anchors.fill: parent
             opacity: pillWindow.viewState === 4 ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 200
+                }
+            }
+
+            onCloseRequested: pillWindow.viewState = 0
+        }
+
+        AppLauncher {
+            id: appLauncher
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Config.launcherWidth
+            height: Config.launcherHeight
+
+            opacity: pillWindow.viewState === 5 ? 1 : 0
             visible: opacity > 0
             Behavior on opacity {
                 NumberAnimation {
