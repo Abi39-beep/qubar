@@ -467,7 +467,8 @@ PanelWindow {
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
             width: Config.launcherWidth
-            height: Config.launcherHeight
+            // THE FIX: We tell it to perfectly stretch to fill the dynamic pill!
+            height: parent.height
 
             opacity: pillWindow.viewState === 5 ? 1 : 0
             visible: opacity > 0
@@ -479,9 +480,9 @@ PanelWindow {
 
             onCloseRequested: pillWindow.viewState = 0
         }
-    }
 
-    Keybinds {
-        target: pillWindow
+        Keybinds {
+            target: pillWindow
+        }
     }
 }

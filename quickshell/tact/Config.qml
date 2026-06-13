@@ -58,7 +58,20 @@ QtObject {
     readonly property int powerMenuBorderWidth: 2
 
     // --- App Launcher Settings ---
-    readonly property int launcherWidth: 500
-    readonly property int launcherHeight: 450
+    readonly property string terminalEmulator: "kitty"
+    readonly property int launcherMaxItems: 6
+    readonly property int launcherWidth: 450
     readonly property int launcherRadius: 24
+
+    // Search Bar
+    readonly property int searchBarHeight: 44
+    readonly property int searchBarRadius: 12
+    readonly property int fontSizeSearchIcon: 20
+    readonly property int fontSizeSearchInput: 15
+
+    // App List Items
+    readonly property int appItemHeight: 44
+    readonly property int appItemRadius: 12
+    readonly property int appIconSize: 28
+    readonly property int fontSizeAppTitle: 15
 }

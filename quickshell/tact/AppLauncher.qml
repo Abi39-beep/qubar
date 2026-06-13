@@ -7,17 +7,17 @@ Item {
     id: launcherRoot
     signal closeRequested
 
-    // --- TERMINAL FIX ---
-    // Change this if you use alacritty, wezterm, or foot instead of kitty!
-    property string terminalEmulator: "kitty"
-
-    // --- SMART HEIGHT MATH ---
-    // 50px (search bar) + 40px (margins/spacing) = 90px base height.
-    // Each app is 54px + 6px spacing = 60px. We cap it at 6 apps max!
+    // --- SMART CONFIG-DRIVEN HEIGHT MATH ---
     property int dynamicHeight: {
-        let visibleItems = Math.min(appList.count, 6);
-        let listHeight = visibleItems > 0 ? (visibleItems * 60) - 6 : 0;
-        return listHeight > 0 ? (90 + listHeight + 16) : 90;
+        let visibleItems = Math.min(appList.count, Config.launcherMaxItems);
+
+        // Item height + 6px spacing between items
+        let listHeight = visibleItems > 0 ? (visibleItems * (Config.appItemHeight + 6)) - 6 : 0;
+
+        // 56px = 20px top margin + 16px column spacing + 20px bottom margin
+        let baseHeight = Config.searchBarHeight + 56;
+
+        return listHeight > 0 ? (baseHeight + listHeight) : baseHeight;
     }
 
     onVisibleChanged: {
@@ -38,8 +38,8 @@ Item {
         Rectangle {
             id: searchBar
             width: parent.width
-            height: 50
-            radius: 12
+            height: Config.searchBarHeight
+            radius: Config.searchBarRadius
             color: Colors.bg2
             border.color: searchInput.activeFocus ? Colors.green : Colors.bg3
             border.width: 2
@@ -59,7 +59,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: ""
                     font.family: Config.fontName
-                    font.pixelSize: 20
+                    font.pixelSize: Config.fontSizeSearchIcon
                     color: searchInput.activeFocus ? Colors.green : Colors.fg2
                     Behavior on color {
                         ColorAnimation {
@@ -71,10 +71,10 @@ Item {
                 TextField {
                     id: searchInput
                     anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - 40
+                    width: parent.width - (Config.fontSizeSearchIcon + 20)
                     color: Colors.fg0
                     font.family: Config.fontName
-                    font.pixelSize: 20
+                    font.pixelSize: Config.fontSizeSearchInput
                     background: null
                     placeholderText: "Search apps or run command..."
                     placeholderTextColor: Colors.bg4
@@ -100,10 +100,10 @@ Item {
 
                     onAccepted: {
                         if (appList.count > 0 && appList.currentIndex >= 0) {
-                            // Grabs the selected item from the delegate directly to use the Smart Trigger
                             appList.currentItem.trigger();
                         } else if (text.trim() !== "") {
-                            Quickshell.execDetached(["bash", "-c", text]);
+                            // Raw text typed in the bar uses Bash
+                            Quickshell.execDetached(["bash", "-c", text.trim()]);
                             launcherRoot.closeRequested();
                         }
                     }
@@ -142,8 +142,8 @@ Item {
             delegate: Rectangle {
                 id: delegateRect
                 width: ListView.view.width
-                height: 54
-                radius: 12
+                height: Config.appItemHeight
+                radius: Config.appItemRadius
 
                 property bool isSelected: ListView.isCurrentItem || appArea.containsMouse
 
@@ -151,24 +151,30 @@ Item {
                 border.color: isSelected ? Colors.bg3 : "transparent"
                 border.width: 2
 
-                // --- THE FOOLPROOF TERMINAL INTERCEPTOR ---
+                // --- THE PROVEN WORKING TRIGGER RESTORED ---
                 function trigger() {
-                    if (modelData.terminal) {
-                        // 1. Get the command
-                        let rawExec = modelData.exec || modelData.name.toLowerCase();
+                    let appName = modelData.name.toLowerCase();
 
-                        // 2. Remove desktop file flags (like %U, %f, etc) that break terminal args
-                        let cleanExec = String(rawExec).replace(/%[a-zA-Z]/g, "").trim();
+                    // Add any other specific terminal apps you use to this list!
+                    let cliApps = ["htop", "btop", "yazi", "ranger", "lf", "cava", "ncmpcpp", "nvtop", "pulsemixer"];
+                    let cliMatch = "";
 
-                        // 3. Force absolute paths and full shell invocation
-                        // We use /bin/sh to ensure the environment is correctly loaded for Kitty
-                        let terminalPath = "/usr/bin/" + launcherRoot.terminalEmulator;
-                        let finalCmd = terminalPath + " -e /bin/sh -c '" + cleanExec + "'";
+                    // Check if the app name contains any of your known terminal apps
+                    for (let i = 0; i < cliApps.length; i++) {
+                        if (appName.includes(cliApps[i])) {
+                            cliMatch = cliApps[i];
+                            break;
+                        }
+                    }
 
-                        Quickshell.execDetached(["/bin/sh", "-c", finalCmd]);
+                    if (cliMatch !== "") {
+                        // 1. Forcefully open known CLI apps natively using Config terminal!
+                        Quickshell.execDetached([Config.terminalEmulator, "-e", cliMatch]);
                     } else {
+                        // 2. Normal GUI apps use Quickshell's native, guaranteed launcher
                         modelData.execute();
                     }
+
                     launcherRoot.closeRequested();
                 }
 
@@ -179,8 +185,8 @@ Item {
 
                     IconImage {
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 30
-                        height: 30
+                        width: Config.appIconSize
+                        height: Config.appIconSize
                         source: modelData.icon ? Quickshell.iconPath(modelData.icon) : ""
                     }
 
@@ -189,7 +195,7 @@ Item {
                         text: modelData.name || ""
                         color: delegateRect.isSelected ? Colors.green : Colors.fg0
                         font.family: Config.fontName
-                        font.pixelSize: 18
+                        font.pixelSize: Config.fontSizeAppTitle
                         font.bold: true
                         Behavior on color {
                             ColorAnimation {
