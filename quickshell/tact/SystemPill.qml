@@ -8,9 +8,9 @@ Rectangle {
 
     visible: Config.showWifi || Config.showBattery
 
-    width: sysContent.width + 24
-    height: 32
-    radius: 16
+    width: sysContent.width + Config.sysPillPadding
+    height: Config.sysPillHeight
+    radius: Config.sysPillRadius
     color: Colors.bg2
 
     // --- 1. NATIVE BATTERY LOGIC ---
@@ -18,7 +18,7 @@ Rectangle {
     readonly property bool isPluggedIn: !UPower.onBattery
 
     // --- 2. SMART NETWORK LOGIC ---
-    property string netType: "none" // "wifi", "wired", or "none"
+    property string netType: "none"
     property int wifiLevel: 0
 
     Timer {
@@ -26,7 +26,6 @@ Rectangle {
         running: Config.showWifi
         repeat: true
         onTriggered: {
-            // Only trigger if the process isn't already running
             if (!netProcess.running) {
                 netProcess.running = true;
             }
@@ -39,7 +38,6 @@ Rectangle {
 
         command: ["bash", "-c", "nmcli -t -f TYPE,STATE dev; echo '---'; nmcli -t -f IN-USE,SIGNAL dev wifi 2>/dev/null"]
 
-        // THE FIX: Properly using Quickshell's IO Parser
         property string fullOutput: ""
 
         stdout: SplitParser {
@@ -50,7 +48,7 @@ Rectangle {
 
         onExited: {
             let raw = fullOutput.trim();
-            fullOutput = ""; // MUST reset for the next timer loop!
+            fullOutput = "";
 
             if (raw === "")
                 return;
@@ -60,18 +58,13 @@ Rectangle {
                 let devState = sections[0];
                 let wifiState = sections[1];
 
-                // 1. Check for Wired Connection
                 if (devState.includes("ethernet:connected")) {
                     sysPill.netType = "wired";
                     sysPill.wifiLevel = 0;
-                } else
-                // 2. Check for Wi-Fi Connection
-                if (devState.includes("wifi:connected")) {
+                } else if (devState.includes("wifi:connected")) {
                     sysPill.netType = "wifi";
-
                     let lines = wifiState.split("\n");
                     let sig = 0;
-
                     for (let i = 0; i < lines.length; i++) {
                         if (lines[i].startsWith("*")) {
                             let parts = lines[i].split(":");
@@ -82,9 +75,7 @@ Rectangle {
                         }
                     }
                     sysPill.wifiLevel = isNaN(sig) ? 0 : sig;
-                } else
-                // 3. Disconnected
-                {
+                } else {
                     sysPill.netType = "none";
                     sysPill.wifiLevel = 0;
                 }
@@ -95,16 +86,15 @@ Rectangle {
     Row {
         id: sysContent
         anchors.centerIn: parent
-        spacing: 12
+        spacing: Config.sysPillSpacing
 
         // --- Network Icons Container ---
         Item {
-            width: 18
-            height: 16
+            width: Config.wifiIconWidth
+            height: Config.wifiIconHeight
             anchors.verticalCenter: parent.verticalCenter
             visible: Config.showWifi
 
-            // Icon A: Wi-Fi Radar
             Canvas {
                 id: wifiCanvas
                 anchors.fill: parent
@@ -115,33 +105,33 @@ Rectangle {
                     var ctx = getContext("2d");
                     ctx.reset();
                     ctx.clearRect(0, 0, width, height);
-                    ctx.lineWidth = 2.0;
+
+                    ctx.lineWidth = Config.wifiLineWidth;
                     ctx.lineCap = "round";
 
                     var cx = width / 2;
                     var cy = height - 2;
 
+                    var activeColor = Colors.aqua;
+                    var inactiveColor = Colors.fg3;
+
                     function drawArc(r, active) {
-                        if (!active)
-                            return;
                         ctx.beginPath();
-                        ctx.strokeStyle = Colors.fg0;
+                        ctx.strokeStyle = active ? activeColor : inactiveColor;
                         ctx.arc(cx, cy, r, Math.PI * 1.25, Math.PI * 1.75);
                         ctx.stroke();
                     }
 
-                    // Base Dot (Dimmed to Colors.fg3 if offline)
+                    var isConnected = (sysPill.netType === "wifi" && sysPill.wifiLevel > 0);
+
                     ctx.beginPath();
-                    ctx.fillStyle = sysPill.netType === "wifi" && sysPill.wifiLevel > 0 ? Colors.fg0 : Colors.fg3;
+                    ctx.fillStyle = isConnected ? activeColor : inactiveColor;
                     ctx.arc(cx, cy, 1.5, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // Draws arcs based on nmcli's native 0-100% signal
-                    if (sysPill.netType === "wifi" && sysPill.wifiLevel > 0) {
-                        drawArc(5, sysPill.wifiLevel > 25);
-                        drawArc(9, sysPill.wifiLevel > 50);
-                        drawArc(13, sysPill.wifiLevel > 75);
-                    }
+                    drawArc(4.5, isConnected && sysPill.wifiLevel > 25);
+                    drawArc(8.5, isConnected && sysPill.wifiLevel > 50);
+                    drawArc(12.5, isConnected && sysPill.wifiLevel > 75);
                 }
 
                 Connections {
@@ -155,7 +145,6 @@ Rectangle {
                 }
             }
 
-            // Icon B: Wired Ethernet Tree
             Canvas {
                 id: wiredCanvas
                 anchors.fill: parent
@@ -166,44 +155,39 @@ Rectangle {
                     var ctx = getContext("2d");
                     ctx.reset();
                     ctx.clearRect(0, 0, width, height);
-                    ctx.lineWidth = 1.5;
-                    ctx.strokeStyle = Colors.fg0;
-                    ctx.fillStyle = Colors.fg0;
+                    ctx.lineWidth = Config.wifiLineWidth - 0.5;
+                    ctx.strokeStyle = Colors.aqua;
+                    ctx.fillStyle = Colors.aqua;
 
-                    // Top dot
                     ctx.beginPath();
-                    ctx.arc(9, 2, 1.5, 0, Math.PI * 2);
-                    ctx.fill();
-                    // Vertical drop
-                    ctx.beginPath();
-                    ctx.moveTo(9, 3);
-                    ctx.lineTo(9, 7);
-                    ctx.stroke();
-                    // Horizontal bar
-                    ctx.beginPath();
-                    ctx.moveTo(4, 7);
-                    ctx.lineTo(14, 7);
-                    ctx.stroke();
-
-                    // 3 Vertical branches
-                    ctx.beginPath();
-                    ctx.moveTo(4, 7);
-                    ctx.lineTo(4, 11);
-                    ctx.moveTo(9, 7);
-                    ctx.lineTo(9, 11);
-                    ctx.moveTo(14, 7);
-                    ctx.lineTo(14, 11);
-                    ctx.stroke();
-
-                    // 3 Bottom dots
-                    ctx.beginPath();
-                    ctx.arc(4, 12, 1.5, 0, Math.PI * 2);
+                    ctx.arc(11, 2, 1.5, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.beginPath();
-                    ctx.arc(9, 12, 1.5, 0, Math.PI * 2);
+                    ctx.moveTo(11, 3);
+                    ctx.lineTo(11, 7);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(6, 7);
+                    ctx.lineTo(16, 7);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(6, 7);
+                    ctx.lineTo(6, 11);
+                    ctx.moveTo(11, 7);
+                    ctx.lineTo(11, 11);
+                    ctx.moveTo(16, 7);
+                    ctx.lineTo(16, 11);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(6, 12, 1.5, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.beginPath();
-                    ctx.arc(14, 12, 1.5, 0, Math.PI * 2);
+                    ctx.arc(11, 12, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(16, 12, 1.5, 0, Math.PI * 2);
                     ctx.fill();
                 }
 
@@ -219,62 +203,80 @@ Rectangle {
         // --- Battery Icon ---
         Row {
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 2
+            spacing: Config.batteryTipSpacing
             visible: Config.showBattery
 
             Rectangle {
-                width: typeof Config.batteryWidth !== "undefined" ? Config.batteryWidth : 30
-                height: 14
-                radius: 3
+                width: Config.batteryWidth
+                height: Config.batteryHeight
+                radius: Config.batteryRadius
                 color: "transparent"
                 border.color: Colors.fg3
-                border.width: 1.5
+                border.width: Config.batteryBorderWidth
 
+                // Dynamic mathematically-perfect fill calculation
                 Rectangle {
                     anchors.left: parent.left
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    anchors.margins: 1.5
-                    radius: 1.5
-                    width: Math.max(0, (parent.width - 3) * (sysPill.batLevel / 100))
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: Config.batteryBorderWidth + Config.batteryFillGap
 
-                    color: sysPill.isPluggedIn ? Colors.aqua : Colors.aqua
+                    height: parent.height - ((Config.batteryBorderWidth + Config.batteryFillGap) * 2)
+                    radius: Config.batteryFillRadius
+
+                    width: Math.max(0, (parent.width - ((Config.batteryBorderWidth + Config.batteryFillGap) * 2)) * (sysPill.batLevel / 100))
+                    color: Colors.aqua
 
                     SequentialAnimation on opacity {
                         running: sysPill.isPluggedIn
                         loops: Animation.Infinite
                         NumberAnimation {
-                            from: 0.6
+                            from: 0.5
                             to: 1.0
-                            duration: 1200
+                            duration: 1000
                             easing.type: Easing.InOutQuad
                         }
                         NumberAnimation {
                             from: 1.0
-                            to: 0.6
-                            duration: 1200
+                            to: 0.5
+                            duration: 1000
                             easing.type: Easing.InOutQuad
                         }
                     }
                 }
 
-                Text {
+                Row {
                     anchors.centerIn: parent
-                    text: (sysPill.isPluggedIn ? "⚡ " : "") + sysPill.batLevel
-                    font.family: Config.fontName
-                    font.pixelSize: 9
-                    font.bold: true
+                    anchors.horizontalCenterOffset: Config.batteryTextOffsetX
+                    anchors.verticalCenterOffset: Config.batteryTextOffsetY
+                    spacing: 1
 
-                    color: Colors.bg0
-                    style: Text.Outline
-                    styleColor: sysPill.isPluggedIn ? Colors.aqua : Colors.aqua
-                    z: 2
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: sysPill.isPluggedIn
+                        text: "󱐋"
+                        font.family: Config.fontName
+                        font.pixelSize: Config.fontSizeBattery
+                        font.bold: true
+                        renderType: Text.NativeRendering
+                        color: sysPill.batLevel > 40 ? Colors.bg0 : Colors.fg0
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: sysPill.batLevel
+                        font.family: Config.fontName
+                        font.pixelSize: Config.fontSizeBattery
+                        font.bold: true
+                        renderType: Text.NativeRendering
+                        color: sysPill.batLevel > 40 ? Colors.bg0 : Colors.fg0
+                    }
                 }
             }
+
             Rectangle {
-                width: 2
-                height: 6
-                radius: 1
+                width: Config.batteryTipWidth
+                height: Config.batteryTipHeight
+                radius: Config.batteryTipRadius
                 color: Colors.fg3
                 anchors.verticalCenter: parent.verticalCenter
             }

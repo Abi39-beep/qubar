@@ -35,10 +35,41 @@ QtObject {
     readonly property int expandedWidth: 480
     readonly property int dashboardSpacing: 24 // Adjust this number to control the gap!
 
-    // --- System Pill ---
+    // --- System Pill Settings ---
     readonly property bool showWifi: true
     readonly property bool showBattery: true
-    readonly property int batteryWidth: 30 // Adjust this to make the battery longer or shorter!
+
+    // Pill Container
+    readonly property int sysPillHeight: 32
+    readonly property int sysPillRadius: 16
+    readonly property int sysPillPadding: 24   // Total horizontal padding added to the width
+    readonly property int sysPillSpacing: 12   // The gap between the Wi-Fi icon and the Battery
+
+    // Wi-Fi Icon
+    readonly property int wifiIconWidth: 22
+    readonly property int wifiIconHeight: 16
+    readonly property real wifiLineWidth: 2.5
+
+    // Battery Body
+    readonly property int batteryWidth: 30
+    readonly property int batteryHeight: 16
+    readonly property int batteryRadius: 4
+    readonly property int batteryBorderWidth: 2
+
+    // Battery Inner Fill
+    readonly property int batteryFillGap: 1    // The empty space between the border and the green fill
+    readonly property int batteryFillRadius: 2
+
+    // Battery Tip
+    readonly property int batteryTipWidth: 2
+    readonly property int batteryTipHeight: 6
+    readonly property int batteryTipRadius: 1
+    readonly property int batteryTipSpacing: 2 // The gap between the main body and the tip
+
+    // Battery Typography & Alignment
+    readonly property int fontSizeBattery: 10
+    readonly property int batteryTextOffsetX: -1 // Visually centers the text away from the tip
+    readonly property int batteryTextOffsetY: 1  // Pushes the text down to fix font baseline padding
 
     // --- Media Controller Settings ---
     readonly property int mediaCtrlWidth: 400
