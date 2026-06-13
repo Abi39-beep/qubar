@@ -74,4 +74,22 @@ QtObject {
     readonly property int appItemRadius: 12
     readonly property int appIconSize: 28
     readonly property int fontSizeAppTitle: 15
+
+    // --- OSD Settings ---
+    readonly property int osdWidth: 260       // Increased to give the bar more room to stretch!
+    readonly property int osdHeight: 50
+    readonly property int osdRadius: 30
+
+    // OSD Internal Spacing
+    readonly property int osdMargin: 16       // Distance from the outer edge of the pill
+    readonly property int osdSpacing: 10      // Distance between icon, bar, and text
+
+    // OSD Typography
+    readonly property int fontSizeOsdIcon: 22
+    readonly property int fontSizeOsdText: 14
+
+    // OSD Component Dimensions
+    readonly property int osdIconWidth: 30
+    readonly property int osdTextWidth: 40
+    readonly property int osdBarHeight: 8
 }

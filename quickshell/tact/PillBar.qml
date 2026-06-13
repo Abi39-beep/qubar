@@ -2,6 +2,8 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Services.Mpris
+import Quickshell.Services.Pipewire
+import Quickshell.Io
 import QtQuick
 
 PanelWindow {
@@ -19,14 +21,9 @@ PanelWindow {
     WlrLayershell.keyboardFocus: (pillWindow.viewState === 1 || pillWindow.viewState === 3 || pillWindow.viewState === 4 || pillWindow.viewState === 5) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // --- THE ULTIMATE WAYLAND MASK FIX ---
-    // We permanently lock the Wayland surface to a massive, static size.
-    // This absolutely destroys all jitter/stutter because Hyprland never has to resize the window!
     implicitWidth: Math.max(Config.expandedWidth, Config.launcherWidth, Config.powerMenuWidth, 600) + 50
     implicitHeight: Math.max(Config.expandedHeight, 600, Config.powerMenuHeight, Config.mediaCtrlHeight) + (Config.topMargin * 2) + 50
 
-    // Quickshell's click-through secret weapon. It tells Wayland that ONLY the
-    // dynamically morphing pill (and the tiny hover trigger zone) can be clicked.
-    // Every other pixel of this massive window becomes 100% invisible to your mouse!
     mask: Region {
         item: pill
         Region {
@@ -41,7 +38,6 @@ PanelWindow {
             pill.forceActiveFocus();
         } else if (viewState === 0) {
             pill.focus = false;
-            Quickshell.execDetached(["bash", "-c", "sleep 0.1 && ADDR=$(hyprctl activewindow | awk 'NR==1 {print $2}'); if [[ \"$ADDR\" != \"\" && \"$ADDR\" != \"Invalid\" ]]; then hyprctl dispatch focuswindow address:0x$ADDR; fi"]);
         }
     }
 
@@ -101,7 +97,8 @@ PanelWindow {
     }
 
     property bool isHoverTriggered: false
-    property bool isVisible: !hasWindows || isHoverTriggered || viewState === 2 || viewState === 1 || viewState === 3 || viewState === 4 || viewState === 5
+    // FIX: State 6 added here so it can show up over fullscreen apps!
+    property bool isVisible: !hasWindows || isHoverTriggered || viewState === 1 || viewState === 2 || viewState === 3 || viewState === 4 || viewState === 5 || viewState === 6
 
     function refreshWorkspaces() {
         var rawWorkspaces = Hyprland.workspaces.values;
@@ -142,6 +139,7 @@ PanelWindow {
 
     Component.onCompleted: {
         refreshWorkspaces();
+        getBri.running = true; // Boots up the brightness tracker on launch
     }
 
     Timer {
@@ -175,6 +173,91 @@ PanelWindow {
         }
         onExited: if (pillWindow.hasWindows)
             hideTimer.restart()
+    }
+
+    // ==========================================
+    // OSD ENGINE (VOLUME & BRIGHTNESS)
+    // ==========================================
+    property real currentOsdValue: 0
+    property string currentOsdIcon: "󰃠"
+    property color currentOsdIconColor: Colors.orange
+    property color currentOsdBarColor: Colors.green
+
+    // --- 1. THE BOOT FIX ---
+    // Prevents the OSD from annoying you and flashing on screen when you reload!
+    property bool osdReady: false
+    Timer {
+        interval: 1500
+        running: true
+        onTriggered: pillWindow.osdReady = true
+    }
+
+    Timer {
+        id: osdHideTimer
+        interval: 2000
+        onTriggered: {
+            if (pillWindow.viewState === 6)
+                pillWindow.viewState = 0;
+        }
+    }
+
+    function triggerOsd(value, icon, iconColor, barColor) {
+        if (!pillWindow.osdReady)
+            return; // Block the trigger if the system is still booting
+
+        pillWindow.currentOsdValue = value;
+        pillWindow.currentOsdIcon = icon;
+        pillWindow.currentOsdIconColor = iconColor;
+        pillWindow.currentOsdBarColor = barColor;
+
+        if (pillWindow.viewState === 0 || pillWindow.viewState === 2 || pillWindow.viewState === 6) {
+            pillWindow.viewState = 6;
+            osdHideTimer.restart();
+        }
+    }
+
+    // --- 2. QUICKSHELL NATIVE VOLUME LISTENER ---
+    // Pipewire requires a PwObjectTracker to actively listen to hardware audio nodes!
+    PwObjectTracker {
+        objects: Pipewire.defaultAudioSink ? [Pipewire.defaultAudioSink] : []
+    }
+
+    // We must access the internal .audio property to get the live volume
+    property var activeAudioNode: Pipewire.defaultAudioSink ? Pipewire.defaultAudioSink.audio : null
+    property real trackedVolume: activeAudioNode ? activeAudioNode.volume : 0
+    property bool trackedMute: activeAudioNode ? activeAudioNode.muted : false
+
+    onTrackedVolumeChanged: {
+        let icn = trackedMute ? "󰝟" : (trackedVolume > 0.5 ? "󰕾" : (trackedVolume > 0 ? "󰖀" : "󰕿"));
+        let clr = trackedMute ? Colors.red : Colors.blue;
+        triggerOsd(trackedVolume, icn, clr, Colors.blue);
+    }
+
+    onTrackedMuteChanged: {
+        let icn = trackedMute ? "󰝟" : (trackedVolume > 0.5 ? "󰕾" : (trackedVolume > 0 ? "󰖀" : "󰕿"));
+        let clr = trackedMute ? Colors.red : Colors.blue;
+        triggerOsd(trackedVolume, icn, clr, Colors.blue);
+    }
+
+    // --- 3. HARDWARE-LEVEL BRIGHTNESS LISTENER ---
+    property real currentBriValue: 0.5
+
+    Process {
+        // Uses inotifywait to instantly catch hardware backlight changes with 0% CPU!
+        command: ["bash", "-c", "while true; do brightnessctl -m; inotifywait -qq -e modify /sys/class/backlight/*/brightness; done"]
+        running: true
+        stdout: SplitParser {
+            onRead: data => {
+                let parts = data.split(",");
+                if (parts.length >= 4) {
+                    let newBri = parseInt(parts[3].replace("%", "")) / 100.0;
+                    if (pillWindow.currentBriValue !== newBri) {
+                        pillWindow.currentBriValue = newBri;
+                        triggerOsd(newBri, "󰃠", Colors.orange, Colors.green);
+                    }
+                }
+            }
+        }
     }
 
     // --- THE MORPHING PILL ---
@@ -229,6 +312,8 @@ PanelWindow {
                 return Config.powerMenuWidth;
             if (pillWindow.viewState === 5)
                 return Config.launcherWidth;
+            if (pillWindow.viewState === 6)
+                return Config.osdWidth; // OSD Width Hook
             return Config.timeWidth;
         }
 
@@ -240,7 +325,9 @@ PanelWindow {
             if (pillWindow.viewState === 4)
                 return Config.powerMenuHeight;
             if (pillWindow.viewState === 5)
-                return appLauncher.dynamicHeight; // <--- The magic link!
+                return appLauncher.dynamicHeight;
+            if (pillWindow.viewState === 6)
+                return Config.osdHeight; // OSD Height Hook
             return Config.pillHeight;
         }
 
@@ -251,6 +338,8 @@ PanelWindow {
                 return Config.powerMenuHeight / 2;
             if (pillWindow.viewState === 5)
                 return Config.launcherRadius;
+            if (pillWindow.viewState === 6)
+                return Config.osdRadius; // OSD Radius Hook
             return height / 2;
         }
 
@@ -467,7 +556,6 @@ PanelWindow {
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
             width: Config.launcherWidth
-            // THE FIX: We tell it to perfectly stretch to fill the dynamic pill!
             height: parent.height
 
             opacity: pillWindow.viewState === 5 ? 1 : 0
@@ -481,8 +569,25 @@ PanelWindow {
             onCloseRequested: pillWindow.viewState = 0
         }
 
-        Keybinds {
-            target: pillWindow
+        Osd {
+            id: osdView
+            anchors.fill: parent
+            opacity: pillWindow.viewState === 6 ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 200
+                }
+            }
+
+            percentage: pillWindow.currentOsdValue
+            icon: pillWindow.currentOsdIcon
+            iconColor: pillWindow.currentOsdIconColor
+            barColor: pillWindow.currentOsdBarColor
         }
+    }
+
+    Keybinds {
+        target: pillWindow
     }
 }
