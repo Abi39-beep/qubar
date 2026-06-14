@@ -77,7 +77,7 @@ Item {
             name: "Logout",
             icon: "󰍃",
             color: Colors.yellow,
-            cmd: ["hyprctl", "dispatch", "exit"]
+            cmd: ["hyprctl", "dispatch", "hl.dsp.exit()"]
         },
         {
             name: "Reboot",

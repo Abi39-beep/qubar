@@ -18,28 +18,22 @@ PanelWindow {
     }
 
     // --- THE HYPRLAND MARGIN FIX ---
-    // Calculates exact reserved space: Pill Height + Top Margin + 10px Hyprland Gap
-    // When alwaysShowPill is false, it drops to 0 so it can float over full-screen apps!
     WlrLayershell.exclusiveZone: Config.alwaysShowPill ? (Config.pillHeight + Config.topMargin) : 0
-
     WlrLayershell.layer: WlrLayer.Top
 
     // === THE NOTIFICATION SERVER ===
     NotificationServer {
         id: notificationServer
-
         onNotification: {
-            // THE FIX: We MUST tell Quickshell to track this, or it deletes it instantly!
             notification.tracked = true;
-
             pillWindow.currentNotification = notification;
             pillWindow.isNotifying = true;
-            pill.forceActiveFocus(); // Grab keyboard focus so Escape works!
+            pill.forceActiveFocus();
         }
     }
 
     // === NOTIFICATION FOCUS ===
-    WlrLayershell.keyboardFocus: (pillWindow.viewState === 1 || pillWindow.viewState === 3 || pillWindow.viewState === 4 || pillWindow.viewState === 5 || pillWindow.isNotifying) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: (pillWindow.viewState === 1 || pillWindow.viewState === 3 || pillWindow.viewState === 4 || pillWindow.viewState === 5 || pillWindow.viewState === 7 || pillWindow.isNotifying) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // --- THE ULTIMATE WAYLAND MASK FIX ---
     implicitWidth: Math.max(Config.expandedWidth, Config.launcherWidth, Config.powerMenuWidth, 600) + 50
@@ -55,7 +49,8 @@ PanelWindow {
     property int viewState: 0
 
     onViewStateChanged: {
-        if (viewState === 1 || viewState === 3 || viewState === 4 || viewState === 5) {
+        // THE FIX: The pill is now the absolute dictator. It ALWAYS holds the focus for state 7.
+        if (viewState === 1 || viewState === 3 || viewState === 4 || viewState === 5 || viewState === 7) {
             pill.forceActiveFocus();
         } else if (viewState === 0 && !pillWindow.isNotifying) {
             pill.focus = false;
@@ -122,7 +117,7 @@ PanelWindow {
     }
 
     property bool isHoverTriggered: false
-    property bool isVisible: Config.alwaysShowPill || !hasWindows || isHoverTriggered || viewState === 1 || viewState === 2 || viewState === 3 || viewState === 4 || viewState === 5 || viewState === 6 || isNotifying
+    property bool isVisible: Config.alwaysShowPill || !hasWindows || isHoverTriggered || viewState === 1 || viewState === 2 || viewState === 3 || viewState === 4 || viewState === 5 || viewState === 6 || viewState === 7 || isNotifying
 
     function refreshWorkspaces() {
         var rawWorkspaces = Hyprland.workspaces.values;
@@ -290,34 +285,43 @@ PanelWindow {
         border.color: Colors.bg2
         border.width: 2
 
-        // === NOTIFICATION ESCAPE KEY ===
+        // --- THE MASTER ESCAPE KEY FIX ---
         Keys.onEscapePressed: {
             if (pillWindow.isNotifying) {
-                if (pillWindow.currentNotification) {
+                if (pillWindow.currentNotification)
                     pillWindow.currentNotification.dismiss();
-                }
                 pillWindow.isNotifying = false;
+            } else if (pillWindow.viewState === 7) {
+                // THE FIX: Peeks inside the Control Center. If Wi-Fi menu is open (1), go back to Grid (0).
+                if (controlCenter.currentView === 1) {
+                    controlCenter.currentView = 0;
+                } else {
+                    pillWindow.viewState = 1;
+                }
             } else if (pillWindow.viewState === 3) {
                 pillWindow.viewState = 1;
             } else if (pillWindow.viewState === 1 || pillWindow.viewState === 4 || pillWindow.viewState === 5) {
                 pillWindow.viewState = 0;
             }
         }
-        Keys.onLeftPressed: {
-            if (pillWindow.viewState === 4)
-                powerMenu.moveLeft();
-        }
-        Keys.onRightPressed: {
-            if (pillWindow.viewState === 4)
-                powerMenu.moveRight();
-        }
-        Keys.onReturnPressed: {
-            if (pillWindow.viewState === 4)
-                powerMenu.executeSelected();
-        }
-        Keys.onEnterPressed: {
-            if (pillWindow.viewState === 4)
-                powerMenu.executeSelected();
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            onEntered: if (pillWindow.hasWindows)
+                hideTimer.stop()
+            onExited: if (pillWindow.hasWindows)
+                hideTimer.restart()
+            onClicked: {
+                // Keep focus locked to the pill even if you click dead space!
+                pill.forceActiveFocus();
+
+                // THE FIX: Added viewState 7 here so clicking dead space properly closes it!
+                if (pillWindow.viewState === 3 || pillWindow.viewState === 4 || pillWindow.viewState === 5 || pillWindow.viewState === 7)
+                    pillWindow.viewState = 1;
+                else
+                    viewState = (pillWindow.viewState === 2) ? 1 : ((pillWindow.viewState === 0) ? 1 : 0);
+            }
         }
 
         width: {
@@ -341,6 +345,8 @@ PanelWindow {
                 return Config.launcherWidth;
             if (pillWindow.viewState === 6)
                 return Config.osdWidth;
+            if (pillWindow.viewState === 7)
+                return Config.ccWidth;
             return Config.timeWidth;
         }
 
@@ -357,6 +363,8 @@ PanelWindow {
                 return appLauncher.dynamicHeight;
             if (pillWindow.viewState === 6)
                 return Config.osdHeight;
+            if (pillWindow.viewState === 7)
+                return Config.ccHeight;
             return Config.pillHeight;
         }
 
@@ -371,6 +379,8 @@ PanelWindow {
                 return Config.launcherRadius;
             if (pillWindow.viewState === 6)
                 return Config.osdRadius;
+            if (pillWindow.viewState === 7)
+                return Config.ccRadius;
             return height / 2;
         }
 
@@ -396,21 +406,6 @@ PanelWindow {
             NumberAnimation {
                 duration: Config.animDuration
                 easing.type: Config.animEasing
-            }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            onEntered: if (pillWindow.hasWindows)
-                hideTimer.stop()
-            onExited: if (pillWindow.hasWindows)
-                hideTimer.restart()
-            onClicked: {
-                if (pillWindow.viewState === 3 || pillWindow.viewState === 4 || pillWindow.viewState === 5)
-                    pillWindow.viewState = 1;
-                else
-                    viewState = (pillWindow.viewState === 2) ? 1 : ((pillWindow.viewState === 0) ? 1 : 0);
             }
         }
 
@@ -513,10 +508,21 @@ PanelWindow {
                 }
             }
 
-            SystemPill {
-                id: sysPill
+            // --- WRAPPED SYSTEM PILL ---
+            MouseArea {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
+
+                width: sysPill.width
+                height: sysPill.height
+                cursorShape: Qt.PointingHandCursor
+
+                onClicked: pillWindow.viewState = 7
+
+                SystemPill {
+                    id: sysPill
+                    anchors.centerIn: parent
+                }
             }
         }
 
@@ -627,6 +633,20 @@ PanelWindow {
             }
 
             onDismissed: pillWindow.isNotifying = false
+        }
+
+        ControlCenter {
+            id: controlCenter
+            anchors.fill: parent
+            opacity: (pillWindow.viewState === 7 && !pillWindow.isNotifying) ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 200
+                }
+            }
+
+            onCloseRequested: pillWindow.viewState = 1
         }
     }
 
