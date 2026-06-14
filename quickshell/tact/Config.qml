@@ -14,12 +14,13 @@ QtObject {
     readonly property int timeWidth: 100
     readonly property int timeWithEqWidth: 140
     readonly property int expandedTimeWidth: 200
+    readonly property bool alwaysShowPill: true
 
     // --- Positioning ---
-    readonly property int topMargin: 12
+    readonly property int topMargin: 10
 
     // --- Morphing Animation Properties ---
-    readonly property int animDuration: 350
+    readonly property int animDuration: 380
     readonly property int animEasing: Easing.OutExpo
 
     // --- Equalizer Settings ---
@@ -28,7 +29,7 @@ QtObject {
     readonly property int eqBarSpacing: 4
     readonly property int eqMaxHeight: 18
     readonly property int eqMinHeight: 3
-    readonly property int eqAnimDuration: 200
+    readonly property int eqAnimDuration: 180
 
     // --- Pop-up/Expanded State ---
     readonly property int expandedHeight: 59
@@ -51,8 +52,8 @@ QtObject {
     readonly property real wifiLineWidth: 2.5
 
     // Battery Body
-    readonly property int batteryWidth: 30
-    readonly property int batteryHeight: 16
+    readonly property int batteryWidth: 34
+    readonly property int batteryHeight: 17
     readonly property int batteryRadius: 4
     readonly property int batteryBorderWidth: 2
 
@@ -123,4 +124,48 @@ QtObject {
     readonly property int osdIconWidth: 30
     readonly property int osdTextWidth: 40
     readonly property int osdBarHeight: 8
+
+    // --- Notification Engine ---
+    readonly property int notifWidth: 360
+    readonly property int notifHeight: 70
+    readonly property int notifRadius: 20
+    readonly property int notifDefaultTimeout: 5000 // 5 seconds
+
+    // Layout & Spacing
+    readonly property int notifMargin: 16
+    readonly property int notifSpacing: 12
+
+    // Icon Settings
+    readonly property int notifIconBoxSize: 38
+    readonly property int notifIconBoxRadius: 10
+    readonly property int notifIconFontSize: 20
+    readonly property string notifDefaultIcon: "󰂚" // Fallback bell icon
+
+    // Typography
+    readonly property int fontSizeNotifTitle: 14
+    readonly property int fontSizeNotifBody: 12
+
+    // Timeout Progress Bar
+    readonly property int notifBarHeight: 4
+    readonly property int notifBarBottomMargin: 8
+
+    // --- Control Center Settings ---
+    readonly property int ccWidth: 380
+    readonly property int ccHeight: 280
+    readonly property int ccRadius: 24
+
+    // Internal Spacing
+    readonly property int ccPadding: 24
+    readonly property int ccSpacing: 16
+
+    // Toggle Buttons
+    readonly property int ccToggleSize: 72
+    readonly property int ccToggleRadius: 20
+    readonly property int fontSizeCcToggleIcon: 24
+    readonly property int fontSizeCcToggleText: 11
+
+    // Sliders
+    readonly property int ccSliderHeight: 48
+    readonly property int ccSliderRadius: 24
+    readonly property int fontSizeCcSliderIcon: 18
 }

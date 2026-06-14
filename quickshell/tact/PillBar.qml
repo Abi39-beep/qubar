@@ -4,6 +4,7 @@ import Quickshell.Hyprland
 import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
 import Quickshell.Io
+import Quickshell.Services.Notifications
 import QtQuick
 
 PanelWindow {
@@ -15,10 +16,30 @@ PanelWindow {
         left: false
         right: false
     }
-    exclusionMode: ExclusionMode.Ignore
+
+    // --- THE HYPRLAND MARGIN FIX ---
+    // Calculates exact reserved space: Pill Height + Top Margin + 10px Hyprland Gap
+    // When alwaysShowPill is false, it drops to 0 so it can float over full-screen apps!
+    WlrLayershell.exclusiveZone: Config.alwaysShowPill ? (Config.pillHeight + Config.topMargin) : 0
+
     WlrLayershell.layer: WlrLayer.Top
 
-    WlrLayershell.keyboardFocus: (pillWindow.viewState === 1 || pillWindow.viewState === 3 || pillWindow.viewState === 4 || pillWindow.viewState === 5) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    // === THE NOTIFICATION SERVER ===
+    NotificationServer {
+        id: notificationServer
+
+        onNotification: {
+            // THE FIX: We MUST tell Quickshell to track this, or it deletes it instantly!
+            notification.tracked = true;
+
+            pillWindow.currentNotification = notification;
+            pillWindow.isNotifying = true;
+            pill.forceActiveFocus(); // Grab keyboard focus so Escape works!
+        }
+    }
+
+    // === NOTIFICATION FOCUS ===
+    WlrLayershell.keyboardFocus: (pillWindow.viewState === 1 || pillWindow.viewState === 3 || pillWindow.viewState === 4 || pillWindow.viewState === 5 || pillWindow.isNotifying) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // --- THE ULTIMATE WAYLAND MASK FIX ---
     implicitWidth: Math.max(Config.expandedWidth, Config.launcherWidth, Config.powerMenuWidth, 600) + 50
@@ -36,10 +57,14 @@ PanelWindow {
     onViewStateChanged: {
         if (viewState === 1 || viewState === 3 || viewState === 4 || viewState === 5) {
             pill.forceActiveFocus();
-        } else if (viewState === 0) {
+        } else if (viewState === 0 && !pillWindow.isNotifying) {
             pill.focus = false;
         }
     }
+
+    // === NOTIFICATION STATE VARIABLES ===
+    property bool isNotifying: false
+    property var currentNotification: null
 
     property var activeWorkspaces: []
     property bool hasWindows: false
@@ -97,8 +122,7 @@ PanelWindow {
     }
 
     property bool isHoverTriggered: false
-    // FIX: State 6 added here so it can show up over fullscreen apps!
-    property bool isVisible: !hasWindows || isHoverTriggered || viewState === 1 || viewState === 2 || viewState === 3 || viewState === 4 || viewState === 5 || viewState === 6
+    property bool isVisible: Config.alwaysShowPill || !hasWindows || isHoverTriggered || viewState === 1 || viewState === 2 || viewState === 3 || viewState === 4 || viewState === 5 || viewState === 6 || isNotifying
 
     function refreshWorkspaces() {
         var rawWorkspaces = Hyprland.workspaces.values;
@@ -139,7 +163,7 @@ PanelWindow {
 
     Component.onCompleted: {
         refreshWorkspaces();
-        getBri.running = true; // Boots up the brightness tracker on launch
+        getBri.running = true;
     }
 
     Timer {
@@ -183,8 +207,6 @@ PanelWindow {
     property color currentOsdIconColor: Colors.orange
     property color currentOsdBarColor: Colors.green
 
-    // --- 1. THE BOOT FIX ---
-    // Prevents the OSD from annoying you and flashing on screen when you reload!
     property bool osdReady: false
     Timer {
         interval: 1500
@@ -203,7 +225,7 @@ PanelWindow {
 
     function triggerOsd(value, icon, iconColor, barColor) {
         if (!pillWindow.osdReady)
-            return; // Block the trigger if the system is still booting
+            return;
 
         pillWindow.currentOsdValue = value;
         pillWindow.currentOsdIcon = icon;
@@ -216,13 +238,10 @@ PanelWindow {
         }
     }
 
-    // --- 2. QUICKSHELL NATIVE VOLUME LISTENER ---
-    // Pipewire requires a PwObjectTracker to actively listen to hardware audio nodes!
     PwObjectTracker {
         objects: Pipewire.defaultAudioSink ? [Pipewire.defaultAudioSink] : []
     }
 
-    // We must access the internal .audio property to get the live volume
     property var activeAudioNode: Pipewire.defaultAudioSink ? Pipewire.defaultAudioSink.audio : null
     property real trackedVolume: activeAudioNode ? activeAudioNode.volume : 0
     property bool trackedMute: activeAudioNode ? activeAudioNode.muted : false
@@ -239,13 +258,12 @@ PanelWindow {
         triggerOsd(trackedVolume, icn, clr, Colors.blue);
     }
 
-    // --- 3. HARDWARE-LEVEL BRIGHTNESS LISTENER ---
     property real currentBriValue: 0.5
 
     Process {
-        // Uses inotifywait to instantly catch hardware backlight changes with 0% CPU!
+        id: getBri
         command: ["bash", "-c", "while true; do brightnessctl -m; inotifywait -qq -e modify /sys/class/backlight/*/brightness; done"]
-        running: true
+        running: false
         stdout: SplitParser {
             onRead: data => {
                 let parts = data.split(",");
@@ -272,11 +290,18 @@ PanelWindow {
         border.color: Colors.bg2
         border.width: 2
 
+        // === NOTIFICATION ESCAPE KEY ===
         Keys.onEscapePressed: {
-            if (pillWindow.viewState === 3)
+            if (pillWindow.isNotifying) {
+                if (pillWindow.currentNotification) {
+                    pillWindow.currentNotification.dismiss();
+                }
+                pillWindow.isNotifying = false;
+            } else if (pillWindow.viewState === 3) {
                 pillWindow.viewState = 1;
-            else if (pillWindow.viewState === 1 || pillWindow.viewState === 4 || pillWindow.viewState === 5)
+            } else if (pillWindow.viewState === 1 || pillWindow.viewState === 4 || pillWindow.viewState === 5) {
                 pillWindow.viewState = 0;
+            }
         }
         Keys.onLeftPressed: {
             if (pillWindow.viewState === 4)
@@ -296,6 +321,8 @@ PanelWindow {
         }
 
         width: {
+            if (pillWindow.isNotifying)
+                return Config.notifWidth;
             if (pillWindow.viewState === 0)
                 return pillWindow.isMediaPlaying ? Config.timeWithEqWidth : Config.timeWidth;
             if (pillWindow.viewState === 1)
@@ -313,11 +340,13 @@ PanelWindow {
             if (pillWindow.viewState === 5)
                 return Config.launcherWidth;
             if (pillWindow.viewState === 6)
-                return Config.osdWidth; // OSD Width Hook
+                return Config.osdWidth;
             return Config.timeWidth;
         }
 
         height: {
+            if (pillWindow.isNotifying)
+                return notifView.dynamicHeight;
             if (pillWindow.viewState === 1)
                 return Config.expandedHeight;
             if (pillWindow.viewState === 3)
@@ -327,11 +356,13 @@ PanelWindow {
             if (pillWindow.viewState === 5)
                 return appLauncher.dynamicHeight;
             if (pillWindow.viewState === 6)
-                return Config.osdHeight; // OSD Height Hook
+                return Config.osdHeight;
             return Config.pillHeight;
         }
 
         radius: {
+            if (pillWindow.isNotifying)
+                return Config.notifRadius;
             if (pillWindow.viewState === 3)
                 return Config.mediaCtrlRadius;
             if (pillWindow.viewState === 4)
@@ -339,7 +370,7 @@ PanelWindow {
             if (pillWindow.viewState === 5)
                 return Config.launcherRadius;
             if (pillWindow.viewState === 6)
-                return Config.osdRadius; // OSD Radius Hook
+                return Config.osdRadius;
             return height / 2;
         }
 
@@ -387,7 +418,7 @@ PanelWindow {
         Row {
             anchors.centerIn: parent
             spacing: 12
-            opacity: pillWindow.viewState === 0 ? 1 : 0
+            opacity: (pillWindow.viewState === 0 && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
             Behavior on opacity {
                 NumberAnimation {
@@ -414,7 +445,7 @@ PanelWindow {
             anchors.fill: parent
             anchors.leftMargin: 24
             anchors.rightMargin: 16
-            opacity: pillWindow.viewState === 1 ? 1 : 0
+            opacity: (pillWindow.viewState === 1 && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
             Behavior on opacity {
                 NumberAnimation {
@@ -493,7 +524,7 @@ PanelWindow {
             id: workspaceRow
             anchors.centerIn: parent
             spacing: 8
-            opacity: pillWindow.viewState === 2 ? 1 : 0
+            opacity: (pillWindow.viewState === 2 && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
             Behavior on opacity {
                 NumberAnimation {
@@ -526,28 +557,26 @@ PanelWindow {
         MediaController {
             id: mediaCtrl
             anchors.fill: parent
-            opacity: pillWindow.viewState === 3 ? 1 : 0
+            opacity: (pillWindow.viewState === 3 && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
                 }
             }
-
             onCloseRequested: pillWindow.viewState = 1
         }
 
         PowerMenu {
             id: powerMenu
             anchors.fill: parent
-            opacity: pillWindow.viewState === 4 ? 1 : 0
+            opacity: (pillWindow.viewState === 4 && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
                 }
             }
-
             onCloseRequested: pillWindow.viewState = 0
         }
 
@@ -557,22 +586,20 @@ PanelWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             width: Config.launcherWidth
             height: parent.height
-
-            opacity: pillWindow.viewState === 5 ? 1 : 0
+            opacity: (pillWindow.viewState === 5 && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
                 }
             }
-
             onCloseRequested: pillWindow.viewState = 0
         }
 
         Osd {
             id: osdView
             anchors.fill: parent
-            opacity: pillWindow.viewState === 6 ? 1 : 0
+            opacity: (pillWindow.viewState === 6 && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
             Behavior on opacity {
                 NumberAnimation {
@@ -584,6 +611,22 @@ PanelWindow {
             icon: pillWindow.currentOsdIcon
             iconColor: pillWindow.currentOsdIconColor
             barColor: pillWindow.currentOsdBarColor
+        }
+
+        NotificationView {
+            id: notifView
+            anchors.fill: parent
+            activeNotif: pillWindow.currentNotification
+
+            opacity: pillWindow.isNotifying ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 200
+                }
+            }
+
+            onDismissed: pillWindow.isNotifying = false
         }
     }
 
