@@ -4,76 +4,131 @@ import Quickshell.Io
 
 Rectangle {
     id: root
-    property bool isActive: false
-    property string subText: "Checking..."
+    signal openMenuRequested
+
+    property bool isRadioOn: false
+    property string currentDevice: ""
 
     height: Config.ccToggleHeight
     radius: Config.ccToggleRadius
-    color: isActive ? Colors.aqua : Colors.bg0
+
+    color: isRadioOn ? Colors.aqua : Colors.bg0
     border.color: Colors.bg3
-    border.width: isActive ? 0 : 1
+    border.width: isRadioOn ? 0 : 1
 
     Process {
-        id: btProc
-        command: ["bash", "-c", "bluetoothctl show | grep -q 'Powered: yes' && echo 'On' || echo 'Off'"]
+        id: radioProc
+        command: ["bash", "-c", "bluetoothctl show | grep -q 'Powered: yes' && echo 'on' || echo 'off'"]
         running: true
         stdout: SplitParser {
             onRead: data => {
-                let status = data.trim();
-                root.isActive = (status === "On");
-                root.subText = status;
+                root.isRadioOn = (data.trim() === "on");
+            }
+        }
+    }
+
+    // THE FIX: Forces an output even if it's empty, completely fixing the "Stuck Name" bug!
+    Process {
+        id: deviceProc
+        command: ["bash", "-c", "dev=$(bluetoothctl devices Connected | head -n 1 | cut -d ' ' -f 3-); echo \"${dev:-NONE}\""]
+        running: true
+        stdout: SplitParser {
+            onRead: data => {
+                let res = data.trim();
+                root.currentDevice = (res === "NONE") ? "" : res;
             }
         }
     }
 
     Timer {
-        interval: 5000
+        interval: 3000
         running: true
         repeat: true
         onTriggered: {
-            btProc.running = false;
-            btProc.running = true;
+            radioProc.running = true;
+            deviceProc.running = true;
         }
+    }
+
+    function getBtIcon() {
+        if (!isRadioOn)
+            return "󰂲";
+        if (currentDevice !== "")
+            return "󰂱";
+        return "󰂯";
     }
 
     Row {
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.left: parent.left
-        anchors.leftMargin: 16
+        anchors.fill: parent
+        anchors.margins: 6
         spacing: 12
 
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: "󰂯"
-            font.family: Config.fontName
-            font.pixelSize: Config.fontSizeCcToggleIcon
-            color: root.isActive ? Colors.bg0 : Colors.fg0
+        Rectangle {
+            width: parent.height
+            height: parent.height
+            radius: width / 2
+            color: root.isRadioOn ? Qt.rgba(0, 0, 0, 0.15) : Colors.bg1
+
+            Text {
+                anchors.centerIn: parent
+                text: root.getBtIcon()
+                font.family: Config.fontName
+                font.pixelSize: Config.fontSizeCcToggleIcon
+                color: root.isRadioOn ? Colors.bg0 : Colors.fg0
+
+                opacity: !root.isRadioOn ? 0.2 : (root.currentDevice !== "" ? 1.0 : 0.6)
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 300
+                    }
+                }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    let cmd = root.isRadioOn ? "bluetoothctl power off" : "bluetoothctl power on";
+                    Qt.createQmlObject('import Quickshell.Io; Process { command: ["bash", "-c", "' + cmd + '"]; running: true }', root, "toggleProc");
+                    root.isRadioOn = !root.isRadioOn;
+
+                    // Instantly clears the name if power is turned off!
+                    if (!root.isRadioOn)
+                        root.currentDevice = "";
+                }
+            }
         }
 
-        Column {
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 2
-            Text {
-                text: "Bluetooth"
-                font.family: Config.fontName
-                font.pixelSize: Config.fontSizeCcToggleTitle
-                font.bold: true
-                color: root.isActive ? Colors.bg0 : Colors.fg0
+        Item {
+            width: parent.width - parent.height - 18
+            height: parent.height
+
+            Column {
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 2
+
+                Text {
+                    text: "Bluetooth"
+                    font.family: Config.fontName
+                    font.pixelSize: Config.fontSizeCcToggleTitle
+                    font.bold: true
+                    color: root.isRadioOn ? Colors.bg0 : Colors.fg0
+                }
+                Text {
+                    text: !root.isRadioOn ? "Off" : (root.currentDevice !== "" ? root.currentDevice : "On")
+                    font.family: Config.fontName
+                    font.pixelSize: Config.fontSizeCcToggleSub
+                    color: root.isRadioOn ? Qt.rgba(Colors.bg0.r, Colors.bg0.g, Colors.bg0.b, 0.7) : Colors.fg3
+                    width: parent.width
+                    elide: Text.ElideRight
+                }
             }
-            Text {
-                text: root.subText
-                font.family: Config.fontName
-                font.pixelSize: Config.fontSizeCcToggleSub
-                color: root.isActive ? Colors.bg1 : Colors.fg3
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.openMenuRequested()
             }
         }
-    }
-
-    MouseArea {
-        anchors.fill: parent
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onEntered: parent.opacity = 0.8
-        onExited: parent.opacity = 1.0
     }
 }

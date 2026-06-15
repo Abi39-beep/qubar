@@ -6,36 +6,55 @@ Item {
     id: wifiMenuRoot
     signal backRequested
 
-    property string targetSsid: ""
-    property bool targetIsActive: false
+    property var knownNetworks: []
+    property string expandedSsid: ""
 
-    // THE FIX: Safe parser for Network Names!
+    onVisibleChanged: {
+        if (!visible)
+            expandedSsid = "";
+    }
+
+    // --- THE FIX: DEDICATED BACKGROUND PROCESSER ---
+    // This safely runs your connect/disconnect commands and WAITS for them to finish before refreshing the UI.
+    Process {
+        id: actionProc
+        running: false
+        onExited: {
+            scanProc.running = false;
+            scanProc.running = true; // Refreshes the list ONLY after nmcli finishes!
+        }
+    }
+
     Process {
         id: scanProc
         command: ["bash", "-c", "nmcli -t -f ACTIVE,SIGNAL,SSID dev wifi list"]
         running: true
+
+        onRunningChanged: {
+            if (running) {
+                networkModel.clear();
+                wifiMenuRoot.knownNetworks = [];
+            }
+        }
+
         stdout: SplitParser {
             onRead: data => {
-                networkModel.clear();
                 let lines = data.split("\n");
-                let seenSsids = {};
+                let currentKnown = wifiMenuRoot.knownNetworks;
 
                 for (let i = 0; i < lines.length; i++) {
                     let line = lines[i].trim();
                     if (!line)
                         continue;
 
-                    let firstColon = line.indexOf(":");
-                    let secondColon = line.indexOf(":", firstColon + 1);
+                    let parts = line.split(":");
+                    if (parts.length >= 3) {
+                        let isActive = (parts[0] === "yes" || parts[0] === "*");
+                        let signal = parseInt(parts[1]) || 0;
+                        let ssid = parts.slice(2).join(":");
 
-                    if (firstColon > -1 && secondColon > -1) {
-                        let activeStr = line.substring(0, firstColon);
-                        let isActive = (activeStr === "yes" || activeStr === "*");
-                        let signal = parseInt(line.substring(firstColon + 1, secondColon)) || 0;
-                        let ssid = line.substring(secondColon + 1);
-
-                        if (ssid !== "" && !seenSsids[ssid]) {
-                            seenSsids[ssid] = true;
+                        if (ssid !== "" && currentKnown.indexOf(ssid) === -1) {
+                            currentKnown.push(ssid);
                             networkModel.append({
                                 "ssid": ssid,
                                 "signal": signal,
@@ -44,6 +63,7 @@ Item {
                         }
                     }
                 }
+                wifiMenuRoot.knownNetworks = currentKnown;
             }
         }
     }
@@ -52,38 +72,40 @@ Item {
         id: networkModel
     }
 
-    // Dynamic Fading for the List Icons
-    function getWifiOpacity(sig) {
-        if (sig > 75)
-            return 1.0;
-        if (sig > 50)
-            return 0.65;
-        if (sig > 25)
-            return 0.35;
-        return 0.15;
-    }
-
     Column {
         anchors.fill: parent
         spacing: 16
 
-        // --- HEADER ---
+        // --- HEADER WITH CIRCULAR BACK BUTTON ---
         Row {
             width: parent.width
-            spacing: 16
-            MouseArea {
-                width: 32
-                height: 32
-                cursorShape: Qt.PointingHandCursor
-                onClicked: wifiMenuRoot.backRequested()
+            spacing: 12
+
+            Rectangle {
+                width: 36
+                height: 36
+                radius: 18
+                color: backArea.containsMouse ? Colors.bg2 : Colors.bg1
+                border.color: Colors.bg2
+                border.width: 1
+
                 Text {
                     anchors.centerIn: parent
                     text: "󰁍"
                     font.family: Config.fontName
-                    font.pixelSize: 20
+                    font.pixelSize: 18
                     color: Colors.fg0
                 }
+
+                MouseArea {
+                    id: backArea
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    hoverEnabled: true
+                    onClicked: wifiMenuRoot.backRequested()
+                }
             }
+
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "Wi-Fi Networks"
@@ -100,6 +122,7 @@ Item {
             height: parent.height - 50
             contentHeight: listCol.implicitHeight
             clip: true
+            interactive: true
 
             Column {
                 id: listCol
@@ -109,199 +132,234 @@ Item {
                 Repeater {
                     model: networkModel
                     Rectangle {
+                        id: networkBox
                         width: parent.width
-                        height: 48
+                        property bool isExpanded: wifiMenuRoot.expandedSsid === model.ssid
+
+                        height: isExpanded ? (model.isActive ? 104 : 124) : 48
                         radius: 12
-                        color: model.isActive ? Colors.bg2 : Colors.bg1
-                        border.color: model.isActive ? Colors.aqua : Colors.bg2
+                        clip: true
+
+                        color: model.isActive ? Colors.bg2 : (netMouseArea.containsMouse ? Colors.bg2 : Colors.bg1)
+                        border.color: model.isActive ? Colors.aqua : (netMouseArea.containsMouse ? Colors.bg3 : Colors.bg2)
                         border.width: 1
 
-                        Row {
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.left: parent.left
-                            anchors.leftMargin: 16
-                            spacing: 12
+                        Behavior on height {
+                            NumberAnimation {
+                                duration: 250
+                                easing.type: Easing.OutQuart
+                            }
+                        }
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: 150
+                            }
+                        }
+
+                        // =========================================
+                        // 1. TOP ROW (Name & Badge)
+                        // =========================================
+                        Item {
+                            width: parent.width
+                            height: 48
 
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: "" // YOUR EXACT SOLID WEDGE
-                                font.family: Config.fontName
-                                font.pixelSize: 18
-                                color: model.isActive ? Colors.aqua : Colors.fg0
-                                opacity: wifiMenuRoot.getWifiOpacity(model.signal)
-                            }
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: model.ssid // Device name fixed!
+                                anchors.left: parent.left
+                                anchors.leftMargin: 16
+                                anchors.right: statusBadge.visible ? statusBadge.left : parent.right
+                                anchors.rightMargin: 16
+                                text: model.ssid
                                 font.family: Config.fontName
                                 font.pixelSize: 14
                                 font.bold: model.isActive
                                 color: model.isActive ? Colors.aqua : Colors.fg0
-                                width: parent.width - 140
                                 elide: Text.ElideRight
                             }
+
+                            Text {
+                                id: statusBadge
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.right: parent.right
+                                anchors.rightMargin: 16
+                                visible: model.isActive
+                                text: "Connected"
+                                color: Colors.aqua
+                                font.family: Config.fontName
+                                font.pixelSize: 12
+                                font.bold: true
+                            }
+
+                            MouseArea {
+                                id: netMouseArea
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                hoverEnabled: true
+                                onClicked: {
+                                    if (wifiMenuRoot.expandedSsid === model.ssid) {
+                                        wifiMenuRoot.expandedSsid = "";
+                                    } else {
+                                        wifiMenuRoot.expandedSsid = model.ssid;
+                                        if (!model.isActive)
+                                            passInput.forceActiveFocus();
+                                    }
+                                }
+                            }
                         }
 
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.right: parent.right
-                            anchors.rightMargin: 16
-                            visible: model.isActive
-                            text: "Connected"
-                            color: Colors.aqua
-                            font.family: Config.fontName
-                            font.pixelSize: 12
-                            font.bold: true
-                        }
+                        // =========================================
+                        // 2. EXPANDED CONTENT AREA
+                        // =========================================
+                        Item {
+                            y: 48
+                            width: parent.width
+                            height: parent.height - 48
+                            opacity: networkBox.isExpanded ? 1 : 0
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: 250
+                                }
+                            }
 
-                        // CLICK LOGIC: Opens the Action Prompt!
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                wifiMenuRoot.targetSsid = model.ssid;
-                                wifiMenuRoot.targetIsActive = model.isActive;
-                                actionPrompt.visible = true;
-                                if (!model.isActive)
-                                    passInput.forceActiveFocus();
+                            // A. PASSWORD BOX
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                anchors.topMargin: 0
+                                spacing: 8
+                                visible: !model.isActive
+
+                                property bool showPass: false
+
+                                Rectangle {
+                                    width: parent.width
+                                    height: 36
+                                    radius: 8
+                                    color: Colors.bg0
+                                    border.color: Colors.aqua
+                                    border.width: 1
+
+                                    TextInput {
+                                        id: passInput
+                                        anchors.left: parent.left
+                                        anchors.right: eyeBtn.left
+                                        anchors.top: parent.top
+                                        anchors.bottom: parent.bottom
+                                        anchors.leftMargin: 10
+                                        anchors.rightMargin: 10
+                                        verticalAlignment: TextInput.AlignVCenter
+
+                                        color: Colors.fg0
+                                        font.family: Config.fontName
+                                        font.pixelSize: 14
+                                        echoMode: parent.parent.showPass ? TextInput.Normal : TextInput.Password
+                                        clip: true
+
+                                        Keys.onEscapePressed: {
+                                            wifiMenuRoot.expandedSsid = "";
+                                            ccRoot.forceActiveFocus();
+                                        }
+
+                                        // THE FIX: Uses actionProc so it waits for Linux to finish connecting!
+                                        onAccepted: {
+                                            actionProc.command = ["bash", "-c", "nmcli dev wifi connect '" + model.ssid + "' password '" + passInput.text + "'"];
+                                            actionProc.running = true;
+                                            wifiMenuRoot.expandedSsid = "";
+                                            ccRoot.forceActiveFocus();
+                                        }
+                                    }
+
+                                    Text {
+                                        id: eyeBtn
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 10
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: parent.parent.showPass ? "󰈈" : "󰈉"
+                                        font.family: Config.fontName
+                                        font.pixelSize: 16
+                                        color: Colors.fg3
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            anchors.margins: -5
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                parent.parent.parent.showPass = !parent.parent.parent.showPass;
+                                                passInput.forceActiveFocus();
+                                            }
+                                        }
+                                    }
+                                }
+                                Text {
+                                    text: "Press Enter to connect."
+                                    font.family: Config.fontName
+                                    font.pixelSize: 11
+                                    color: Colors.fg3
+                                }
+                            }
+
+                            // B. DISCONNECT / FORGET BUTTONS
+                            Row {
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                anchors.topMargin: 4
+                                spacing: 12
+                                visible: model.isActive
+
+                                Rectangle {
+                                    width: (parent.width - 12) / 2
+                                    height: 36
+                                    radius: 8
+                                    color: Colors.bg2
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "Disconnect"
+                                        color: Colors.fg0
+                                        font.family: Config.fontName
+                                        font.pixelSize: 13
+                                        font.bold: true
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+
+                                        // THE FIX: Uses actionProc so it waits to disconnect before refreshing!
+                                        onClicked: {
+                                            actionProc.command = ["bash", "-c", "nmcli con down id '" + model.ssid + "'"];
+                                            actionProc.running = true;
+                                            wifiMenuRoot.expandedSsid = "";
+                                        }
+                                    }
+                                }
+                                Rectangle {
+                                    width: (parent.width - 12) / 2
+                                    height: 36
+                                    radius: 8
+                                    color: Colors.red
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "Forget"
+                                        color: Colors.bg0
+                                        font.family: Config.fontName
+                                        font.pixelSize: 13
+                                        font.bold: true
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+
+                                        // THE FIX: Uses actionProc so it waits to forget before refreshing!
+                                        onClicked: {
+                                            actionProc.command = ["bash", "-c", "nmcli con delete id '" + model.ssid + "'"];
+                                            actionProc.running = true;
+                                            wifiMenuRoot.expandedSsid = "";
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            }
-        }
-
-        // --- THE ACTION PROMPT (Connect / Disconnect / Forget) ---
-        Rectangle {
-            id: actionPrompt
-            anchors.fill: parent
-            color: Colors.bg0
-            radius: 16
-            visible: false
-            z: 10
-
-            Column {
-                anchors.centerIn: parent
-                spacing: 16
-                width: parent.width - 40
-
-                Text {
-                    text: wifiMenuRoot.targetIsActive ? "Manage " + wifiMenuRoot.targetSsid : "Connect to " + wifiMenuRoot.targetSsid
-                    font.family: Config.fontName
-                    font.pixelSize: 14
-                    font.bold: true
-                    color: Colors.fg0
-                    width: parent.width
-                    elide: Text.ElideRight
-                }
-
-                // UI 1: PASSWORD BOX (If Not Connected)
-                Column {
-                    width: parent.width
-                    spacing: 12
-                    visible: !wifiMenuRoot.targetIsActive
-
-                    Rectangle {
-                        width: parent.width
-                        height: 40
-                        radius: 8
-                        color: Colors.bg1
-                        border.color: Colors.aqua
-                        border.width: 1
-
-                        TextInput {
-                            id: passInput
-                            anchors.fill: parent
-                            anchors.margins: 10
-                            color: Colors.fg0
-                            font.family: Config.fontName
-                            font.pixelSize: 14
-                            echoMode: TextInput.Password
-                            clip: true
-
-                            Keys.onEscapePressed: {
-                                actionPrompt.visible = false;
-                                ccRoot.forceActiveFocus();
-                            }
-                            onAccepted: {
-                                Qt.createQmlObject('import Quickshell.Io; Process { command: ["bash", "-c", "nmcli dev wifi connect \'' + wifiMenuRoot.targetSsid + '\' password \'' + passInput.text + '\'"]; running: true }', wifiMenuRoot, "connectProc");
-                                actionPrompt.visible = false;
-                                ccRoot.forceActiveFocus();
-                                scanProc.running = false;
-                                scanProc.running = true; // Refresh list
-                            }
-                        }
-                    }
-                    Text {
-                        text: "Press Enter to connect. Esc to cancel."
-                        font.family: Config.fontName
-                        font.pixelSize: 11
-                        color: Colors.fg3
-                    }
-                }
-
-                // UI 2: DISCONNECT & FORGET BUTTONS (If you click a Connected Network!)
-                Row {
-                    width: parent.width
-                    spacing: 12
-                    visible: wifiMenuRoot.targetIsActive
-
-                    // The Disconnect Button
-                    Rectangle {
-                        width: (parent.width - 12) / 2
-                        height: 40
-                        radius: 8
-                        color: Colors.bg2
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Disconnect"
-                            color: Colors.fg0
-                            font.family: Config.fontName
-                            font.pixelSize: 13
-                            font.bold: true
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                Qt.createQmlObject('import Quickshell.Io; Process { command: ["bash", "-c", "nmcli con down id \'' + wifiMenuRoot.targetSsid + '\'"]; running: true }', wifiMenuRoot, "discProc");
-                                actionPrompt.visible = false;
-                                scanProc.running = false;
-                                scanProc.running = true;
-                            }
-                        }
-                    }
-
-                    // The Forget Button
-                    Rectangle {
-                        width: (parent.width - 12) / 2
-                        height: 40
-                        radius: 8
-                        color: Colors.red
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Forget"
-                            color: Colors.bg0
-                            font.family: Config.fontName
-                            font.pixelSize: 13
-                            font.bold: true
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                Qt.createQmlObject('import Quickshell.Io; Process { command: ["bash", "-c", "nmcli con delete id \'' + wifiMenuRoot.targetSsid + '\'"]; running: true }', wifiMenuRoot, "forgetProc");
-                                actionPrompt.visible = false;
-                                scanProc.running = false;
-                                scanProc.running = true;
-                            }
-                        }
-                    }
-                }
-            }
-            Keys.onEscapePressed: {
-                actionPrompt.visible = false;
-                ccRoot.forceActiveFocus();
             }
         }
     }

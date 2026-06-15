@@ -28,7 +28,6 @@ Rectangle {
         }
     }
 
-    // THE FIX: Bulletproof parser that doesn't delete your network's spaces!
     Process {
         id: ssidProc
         command: ["bash", "-c", "nmcli -t -f ACTIVE,SIGNAL,SSID dev wifi list | grep -E '^yes|^\\*' | head -n 1"]
@@ -42,12 +41,10 @@ Rectangle {
                     return;
                 }
 
-                let firstColon = line.indexOf(":");
-                let secondColon = line.indexOf(":", firstColon + 1);
-
-                if (firstColon > -1 && secondColon > -1) {
-                    root.currentSignal = parseInt(line.substring(firstColon + 1, secondColon)) || 0;
-                    root.currentSsid = line.substring(secondColon + 1); // Safely grabs the exact name
+                let parts = line.split(":");
+                if (parts.length >= 3) {
+                    root.currentSignal = parseInt(parts[1]) || 0;
+                    root.currentSsid = parts.slice(2).join(":");
                 }
             }
         }
@@ -63,17 +60,17 @@ Rectangle {
         }
     }
 
-    // THE FIX: Dynamic Brightness (Opacity) for the Solid Wedge!
+    // THE FIX: Fading Opacity Math for the Solid Wedge
     function getWifiOpacity(sig) {
         if (!isRadioOn || currentSsid === "")
-            return 0.2;
+            return 0.2; // Barely visible if off
         if (sig > 75)
             return 1.0;  // Full brightness
         if (sig > 50)
             return 0.65; // Slightly faded
         if (sig > 25)
             return 0.35; // Faded
-        return 0.15;               // Barely visible
+        return 0.15;               // Weak signal
     }
 
     Row {
@@ -81,17 +78,16 @@ Rectangle {
         anchors.margins: 6
         spacing: 12
 
-        // --- THE CIRCLE BACKGROUND ---
         Rectangle {
             width: parent.height
             height: parent.height
             radius: width / 2
             color: root.isRadioOn ? Qt.rgba(0, 0, 0, 0.15) : Colors.bg1
 
-            // The Icon
+            // YOUR EXACT ICON: The Solid Wedge
             Text {
                 anchors.centerIn: parent
-                text: "" // YOUR EXACT SOLID WEDGE ICON
+                text: ""
                 font.family: Config.fontName
                 font.pixelSize: Config.fontSizeCcToggleIcon
                 color: root.isRadioOn ? Colors.bg0 : Colors.fg0
@@ -116,7 +112,6 @@ Rectangle {
             }
         }
 
-        // --- MENU OPENER TEXT ---
         Item {
             width: parent.width - parent.height - 18
             height: parent.height

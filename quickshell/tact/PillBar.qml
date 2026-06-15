@@ -292,8 +292,8 @@ PanelWindow {
                     pillWindow.currentNotification.dismiss();
                 pillWindow.isNotifying = false;
             } else if (pillWindow.viewState === 7) {
-                // THE FIX: Peeks inside the Control Center. If Wi-Fi menu is open (1), go back to Grid (0).
-                if (controlCenter.currentView === 1) {
+                // THE FIX: Now checks for BOTH Wi-Fi (1) and Bluetooth (2)!
+                if (controlCenter.currentView === 1 || controlCenter.currentView === 2) {
                     controlCenter.currentView = 0;
                 } else {
                     pillWindow.viewState = 1;
