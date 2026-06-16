@@ -9,12 +9,23 @@ Rectangle {
     property bool isRadioOn: false
     property string currentDevice: ""
 
+    // THE FIX: Combines both mouse areas to detect if the mouse is ANYWHERE on the button!
+    property bool isHovered: menuArea.containsMouse || circleArea.containsMouse
+
     height: Config.ccToggleHeight
     radius: Config.ccToggleRadius
 
-    color: isRadioOn ? Colors.aqua : Colors.bg0
+    // THE FIX: Entire box shifts color on hover
+    color: isRadioOn ? (isHovered ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.85) : Colors.aqua) : (isHovered ? Colors.bg1 : Colors.bg0)
+
     border.color: Colors.bg3
     border.width: isRadioOn ? 0 : 1
+
+    Behavior on color {
+        ColorAnimation {
+            duration: 150
+        }
+    }
 
     Process {
         id: radioProc
@@ -27,7 +38,6 @@ Rectangle {
         }
     }
 
-    // THE FIX: Forces an output even if it's empty, completely fixing the "Stuck Name" bug!
     Process {
         id: deviceProc
         command: ["bash", "-c", "dev=$(bluetoothctl devices Connected | head -n 1 | cut -d ' ' -f 3-); echo \"${dev:-NONE}\""]
@@ -67,32 +77,36 @@ Rectangle {
             width: parent.height
             height: parent.height
             radius: width / 2
-            color: root.isRadioOn ? Qt.rgba(0, 0, 0, 0.15) : Colors.bg1
+
+            // THE FIX: The inner circle has its own distinct hover highlight!
+            color: root.isRadioOn ? (circleArea.containsMouse ? Qt.rgba(0, 0, 0, 0.25) : Qt.rgba(0, 0, 0, 0.15)) : (circleArea.containsMouse ? Colors.bg2 : Colors.bg1)
+
+            Behavior on color {
+                ColorAnimation {
+                    duration: 150
+                }
+            }
 
             Text {
                 anchors.centerIn: parent
                 text: root.getBtIcon()
                 font.family: Config.fontName
                 font.pixelSize: Config.fontSizeCcToggleIcon
-                color: root.isRadioOn ? Colors.bg0 : Colors.fg0
 
-                opacity: !root.isRadioOn ? 0.2 : (root.currentDevice !== "" ? 1.0 : 0.6)
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: 300
-                    }
-                }
+                // THE FIX: Icon is strictly bg0 and fully opaque when ON!
+                color: root.isRadioOn ? Colors.bg0 : Colors.fg0
+                opacity: root.isRadioOn ? 1.0 : 0.6
             }
 
             MouseArea {
+                id: circleArea
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
+                hoverEnabled: true // Required for hover
                 onClicked: {
                     let cmd = root.isRadioOn ? "bluetoothctl power off" : "bluetoothctl power on";
                     Qt.createQmlObject('import Quickshell.Io; Process { command: ["bash", "-c", "' + cmd + '"]; running: true }', root, "toggleProc");
                     root.isRadioOn = !root.isRadioOn;
-
-                    // Instantly clears the name if power is turned off!
                     if (!root.isRadioOn)
                         root.currentDevice = "";
                 }
@@ -125,8 +139,10 @@ Rectangle {
             }
 
             MouseArea {
+                id: menuArea
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
+                hoverEnabled: true // Required for box hover
                 onClicked: root.openMenuRequested()
             }
         }

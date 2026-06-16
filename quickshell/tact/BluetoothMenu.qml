@@ -146,7 +146,6 @@ Item {
             width: parent.width
             height: 36
 
-            // LEFT SIDE: Back Button & Title
             Row {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
@@ -185,13 +184,11 @@ Item {
                 }
             }
 
-            // RIGHT SIDE: Highlighted Refresh Icon & Toggle Switch
             Row {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
 
-                // 1. THE REFRESH ICON (Now with circular hover highlight!)
                 Rectangle {
                     width: 36
                     height: 36
@@ -218,16 +215,15 @@ Item {
                         id: scanArea
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        hoverEnabled: true // Required for highlight
+                        hoverEnabled: true
                         onClicked: toggleScan(!btMenuRoot.isScanning)
                     }
                 }
 
-                // 2. THE PHYSICAL TOGGLE SWITCH (Now brightens on hover!)
                 Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 44
-                    height: 36 // Slightly expanded to make clicking easier
+                    height: 36
 
                     Rectangle {
                         anchors.centerIn: parent
@@ -235,7 +231,6 @@ Item {
                         height: 22
                         radius: 11
 
-                        // Track changes color on hover
                         color: btMenuRoot.isRadioOn ? (pwrArea.containsMouse ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.8) : Colors.aqua) : (pwrArea.containsMouse ? Colors.bg2 : Colors.bg1)
 
                         border.color: btMenuRoot.isRadioOn ? Colors.aqua : Colors.bg3
@@ -254,7 +249,6 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             x: btMenuRoot.isRadioOn ? parent.width - width - 4 : 4
 
-                            // Thumb subtly brightens on hover
                             color: btMenuRoot.isRadioOn ? Colors.bg0 : (pwrArea.containsMouse ? Colors.fg2 : Colors.fg3)
 
                             Behavior on x {
@@ -275,7 +269,7 @@ Item {
                         id: pwrArea
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        hoverEnabled: true // Required for highlight
+                        hoverEnabled: true
                         onClicked: {
                             let cmd = btMenuRoot.isRadioOn ? "bluetoothctl power off" : "bluetoothctl power on";
                             actionProc.command = ["bash", "-c", cmd];
@@ -287,10 +281,18 @@ Item {
             }
         }
 
+        // --- THE FIX: SEPARATOR LINE ---
+        Rectangle {
+            width: parent.width
+            height: 1
+            color: Colors.bg3
+        }
+
         // --- BLUETOOTH LIST ---
+        // Height specifically accounts for the header (36), spacing (16+16), and the new line (1)
         Flickable {
             width: parent.width
-            height: parent.height - 50
+            height: parent.height - 69
             contentHeight: listCol.height
             clip: true
             interactive: true

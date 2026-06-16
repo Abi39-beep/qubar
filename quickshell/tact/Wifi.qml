@@ -10,12 +10,21 @@ Rectangle {
     property string currentSsid: ""
     property int currentSignal: 0
 
+    property bool isHovered: menuArea.containsMouse || circleArea.containsMouse
+
     height: Config.ccToggleHeight
     radius: Config.ccToggleRadius
 
-    color: isRadioOn ? Colors.aqua : Colors.bg0
+    color: isRadioOn ? (isHovered ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.85) : Colors.aqua) : (isHovered ? Colors.bg1 : Colors.bg0)
+
     border.color: Colors.bg3
     border.width: isRadioOn ? 0 : 1
+
+    Behavior on color {
+        ColorAnimation {
+            duration: 150
+        }
+    }
 
     Process {
         id: radioProc
@@ -30,21 +39,21 @@ Rectangle {
 
     Process {
         id: ssidProc
-        command: ["bash", "-c", "nmcli -t -f ACTIVE,SIGNAL,SSID dev wifi list | grep -E '^yes|^\\*' | head -n 1"]
+        command: ["bash", "-c", "val=$(nmcli -t -f ACTIVE,SIGNAL,SSID dev wifi list | grep -E '^yes|^\\*' | head -n 1); echo \"${val:-NONE}\""]
         running: true
         stdout: SplitParser {
             onRead: data => {
-                let line = data.trim();
-                if (!line) {
+                let res = data.trim();
+                if (res === "NONE" || res === "") {
                     root.currentSsid = "";
                     root.currentSignal = 0;
-                    return;
-                }
-
-                let parts = line.split(":");
-                if (parts.length >= 3) {
-                    root.currentSignal = parseInt(parts[1]) || 0;
-                    root.currentSsid = parts.slice(2).join(":");
+                } else {
+                    let firstColon = res.indexOf(":");
+                    let secondColon = res.indexOf(":", firstColon + 1);
+                    if (firstColon > -1 && secondColon > -1) {
+                        root.currentSignal = parseInt(res.substring(firstColon + 1, secondColon)) || 0;
+                        root.currentSsid = res.substring(secondColon + 1);
+                    }
                 }
             }
         }
@@ -60,17 +69,17 @@ Rectangle {
         }
     }
 
-    // THE FIX: Fading Opacity Math for the Solid Wedge
+    // THE FIX: If "On" but disconnected, return 1.0 (Fully solid/opaque)
     function getWifiOpacity(sig) {
-        if (!isRadioOn || currentSsid === "")
-            return 0.2; // Barely visible if off
+        if (root.currentSsid === "")
+            return 1.0;
         if (sig > 75)
-            return 1.0;  // Full brightness
+            return 1.0;
         if (sig > 50)
-            return 0.65; // Slightly faded
+            return 0.75;
         if (sig > 25)
-            return 0.35; // Faded
-        return 0.15;               // Weak signal
+            return 0.50;
+        return 0.35; // Kept above 0.15 so it never looks washed out!
     }
 
     Row {
@@ -82,18 +91,24 @@ Rectangle {
             width: parent.height
             height: parent.height
             radius: width / 2
-            color: root.isRadioOn ? Qt.rgba(0, 0, 0, 0.15) : Colors.bg1
 
-            // YOUR EXACT ICON: The Solid Wedge
+            color: root.isRadioOn ? (circleArea.containsMouse ? Qt.rgba(0, 0, 0, 0.25) : Qt.rgba(0, 0, 0, 0.15)) : (circleArea.containsMouse ? Colors.bg2 : Colors.bg1)
+
+            Behavior on color {
+                ColorAnimation {
+                    duration: 150
+                }
+            }
+
             Text {
                 anchors.centerIn: parent
                 text: ""
                 font.family: Config.fontName
                 font.pixelSize: Config.fontSizeCcToggleIcon
-                color: root.isRadioOn ? Colors.bg0 : Colors.fg0
 
-                // Applies the dynamic signal fading!
-                opacity: root.getWifiOpacity(root.currentSignal)
+                // THE FIX: Color is strictly bg0, and opacity stays solid when ON!
+                color: root.isRadioOn ? Colors.bg0 : Colors.fg0
+                opacity: root.isRadioOn ? root.getWifiOpacity(root.currentSignal) : 0.6
                 Behavior on opacity {
                     NumberAnimation {
                         duration: 300
@@ -102,12 +117,18 @@ Rectangle {
             }
 
             MouseArea {
+                id: circleArea
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
+                hoverEnabled: true
                 onClicked: {
                     let cmd = root.isRadioOn ? "nmcli radio wifi off" : "nmcli radio wifi on";
                     Qt.createQmlObject('import Quickshell.Io; Process { command: ["bash", "-c", "' + cmd + '"]; running: true }', root, "toggleProc");
                     root.isRadioOn = !root.isRadioOn;
+                    if (!root.isRadioOn) {
+                        root.currentSsid = "";
+                        root.currentSignal = 0;
+                    }
                 }
             }
         }
@@ -138,8 +159,10 @@ Rectangle {
             }
 
             MouseArea {
+                id: menuArea
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
+                hoverEnabled: true
                 onClicked: root.openMenuRequested()
             }
         }
