@@ -9,6 +9,7 @@ Item {
     property string expandedMac: ""
     property bool isRadioOn: false
     property bool isScanning: false
+    property bool isToggling: false
 
     onVisibleChanged: {
         if (!visible) {
@@ -21,27 +22,53 @@ Item {
         }
     }
 
+    onIsRadioOnChanged: {
+        if (!isRadioOn) {
+            btModel.clear();
+            if (isScanning)
+                toggleScan(false);
+        }
+    }
+
+    Timer {
+        id: toggleLockTimer
+        interval: 2000
+        onTriggered: btMenuRoot.isToggling = false
+    }
+
     Process {
         id: radioProc
         command: ["bash", "-c", "bluetoothctl show | grep -q 'Powered: yes' && echo 'on' || echo 'off'"]
         running: true
         stdout: SplitParser {
             onRead: data => {
-                btMenuRoot.isRadioOn = (data.trim() === "on");
+                if (!btMenuRoot.isToggling) {
+                    btMenuRoot.isRadioOn = (data.trim() === "on");
+                }
             }
         }
     }
     Timer {
+        id: radioTimer
         interval: 3000
         running: true
         repeat: true
         onTriggered: radioProc.running = true
     }
 
+    // --- THE FIX: THE NATIVE DATA DRAIN ---
     Process {
-        id: scanToggleProc
+        id: scanProc
+        command: ["bluetoothctl", "scan", "on"]
         running: false
+
+        // THIS IS THE MAGIC TRICK: It actively "eats" the massive text output from the scanner.
+        // This stops Quickshell from freezing AND forces Linux to keep the physical radio scan alive!
+        stdout: SplitParser {
+            onRead: data => { /* Silently drain the text pipe */ }
+        }
     }
+
     Timer {
         id: scanTimer
         interval: 15000
@@ -50,12 +77,15 @@ Item {
 
     function toggleScan(start) {
         btMenuRoot.isScanning = start;
-        scanToggleProc.command = ["bash", "-c", start ? "bluetoothctl scan on" : "bluetoothctl scan off"];
-        scanToggleProc.running = true;
-        if (start)
+        if (start) {
+            scanProc.running = false;
+            scanProc.running = true;
             scanTimer.restart();
-        else
+        } else {
+            scanProc.running = false;
             scanTimer.stop();
+            Qt.createQmlObject('import Quickshell.Io; Process { command: ["bluetoothctl", "scan", "off"]; running: true }', btMenuRoot, "stopProc");
+        }
     }
 
     Process {
@@ -79,7 +109,7 @@ Item {
 
     Process {
         id: fetchDevicesProc
-        command: ["bash", "-c", "connected=$(bluetoothctl devices Connected | awk '{print $2}'); bluetoothctl devices | while read -r _ mac name; do [ -z \"$name\" ] && continue; if echo \"$connected\" | grep -q \"$mac\"; then echo \"yes|$mac|$name\"; else echo \"no|$mac|$name\"; fi; done"]
+        command: ["bash", "-c", "connected=$(bluetoothctl devices Connected | awk '{print $2}'); bluetoothctl devices | while read -r _ mac name; do if echo \"$connected\" | grep -q \"$mac\"; then echo \"yes|$mac|$name\"; else echo \"no|$mac|$name\"; fi; done"]
         running: true
 
         stdout: SplitParser {
@@ -96,36 +126,40 @@ Item {
                         let mac = parts[1];
                         let name = parts.slice(2).join("|").trim();
 
-                        if (name !== "" && name !== mac) {
-                            let found = false;
-                            for (let j = 0; j < btModel.count; j++) {
-                                if (btModel.get(j).mac === mac) {
-                                    if (btModel.get(j).isActive !== isActive) {
-                                        btModel.setProperty(j, "isActive", isActive);
+                        if (name === "")
+                            name = mac;
 
-                                        if (isActive)
-                                            btModel.move(j, 0, 1);
-                                        else
-                                            btModel.move(j, btModel.count - 1, 1);
-                                    }
-                                    found = true;
-                                    break;
+                        let found = false;
+                        for (let j = 0; j < btModel.count; j++) {
+                            if (btModel.get(j).mac === mac) {
+                                if (btModel.get(j).isActive !== isActive) {
+                                    btModel.setProperty(j, "isActive", isActive);
+                                    if (isActive)
+                                        btModel.move(j, 0, 1);
+                                    else
+                                        btModel.move(j, btModel.count - 1, 1);
                                 }
+
+                                if (btModel.get(j).name !== name && name !== mac) {
+                                    btModel.setProperty(j, "name", name);
+                                }
+                                found = true;
+                                break;
                             }
-                            if (!found) {
-                                if (isActive)
-                                    btModel.insert(0, {
-                                        "name": name,
-                                        "mac": mac,
-                                        "isActive": isActive
-                                    });
-                                else
-                                    btModel.append({
-                                        "name": name,
-                                        "mac": mac,
-                                        "isActive": isActive
-                                    });
-                            }
+                        }
+                        if (!found) {
+                            if (isActive)
+                                btModel.insert(0, {
+                                    "name": name,
+                                    "mac": mac,
+                                    "isActive": isActive
+                                });
+                            else
+                                btModel.append({
+                                    "name": name,
+                                    "mac": mac,
+                                    "isActive": isActive
+                                });
                         }
                     }
                 }
@@ -271,9 +305,17 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         hoverEnabled: true
                         onClicked: {
+                            btMenuRoot.isToggling = true;
+                            toggleLockTimer.restart();
+
+                            if (btMenuRoot.isRadioOn && btMenuRoot.isScanning) {
+                                toggleScan(false);
+                            }
+
                             let cmd = btMenuRoot.isRadioOn ? "bluetoothctl power off" : "bluetoothctl power on";
                             actionProc.command = ["bash", "-c", cmd];
                             actionProc.running = true;
+
                             btMenuRoot.isRadioOn = !btMenuRoot.isRadioOn;
                         }
                     }
@@ -281,7 +323,6 @@ Item {
             }
         }
 
-        // --- THE FIX: SEPARATOR LINE ---
         Rectangle {
             width: parent.width
             height: 1
@@ -289,7 +330,6 @@ Item {
         }
 
         // --- BLUETOOTH LIST ---
-        // Height specifically accounts for the header (36), spacing (16+16), and the new line (1)
         Flickable {
             width: parent.width
             height: parent.height - 69
@@ -329,7 +369,6 @@ Item {
                             }
                         }
 
-                        // 1. TOP ROW
                         Item {
                             width: parent.width
                             height: 48
@@ -370,7 +409,6 @@ Item {
                             }
                         }
 
-                        // 2. EXPANDED ACTION AREA
                         Item {
                             y: 48
                             width: parent.width
@@ -416,6 +454,7 @@ Item {
                                         cursorShape: Qt.PointingHandCursor
                                         hoverEnabled: true
                                         onClicked: {
+                                            actionProc.running = false;
                                             let cmd = model.isActive ? "bluetoothctl disconnect '" + model.mac + "'" : "bluetoothctl pair '" + model.mac + "'; bluetoothctl trust '" + model.mac + "'; bluetoothctl connect '" + model.mac + "'";
 
                                             actionProc.command = ["bash", "-c", cmd];
@@ -450,6 +489,7 @@ Item {
                                         cursorShape: Qt.PointingHandCursor
                                         hoverEnabled: true
                                         onClicked: {
+                                            actionProc.running = false;
                                             actionProc.command = ["bash", "-c", "bluetoothctl remove '" + model.mac + "'"];
                                             actionProc.running = true;
                                             btMenuRoot.expandedMac = "";
@@ -460,6 +500,10 @@ Item {
                                                     break;
                                                 }
                                             }
+
+                                            // THE FIX: Automatically jump-starts a scan right after forgetting a device
+                                            // so it can instantly find it again when put in pairing mode!
+                                            toggleScan(true);
                                         }
                                     }
                                 }
