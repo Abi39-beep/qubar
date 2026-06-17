@@ -56,14 +56,11 @@ Item {
         onTriggered: radioProc.running = true
     }
 
-    // --- THE FIX: THE NATIVE DATA DRAIN ---
     Process {
         id: scanProc
         command: ["bluetoothctl", "scan", "on"]
         running: false
 
-        // THIS IS THE MAGIC TRICK: It actively "eats" the massive text output from the scanner.
-        // This stops Quickshell from freezing AND forces Linux to keep the physical radio scan alive!
         stdout: SplitParser {
             onRead: data => { /* Silently drain the text pipe */ }
         }
@@ -185,13 +182,21 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 12
 
+                // THE FIX: Premium Back Button Background
                 Rectangle {
                     width: 36
                     height: 36
                     radius: 18
-                    color: backArea.containsMouse ? Colors.bg2 : "transparent"
-                    border.color: Colors.bg2
+                    color: backArea.containsMouse ? Colors.bg2 : Colors.bg1
+                    border.color: Colors.bg3
                     border.width: 1
+
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: 150
+                        }
+                    }
+
                     Text {
                         anchors.centerIn: parent
                         text: "󰁍"
@@ -223,11 +228,20 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
 
+                // THE FIX: Premium Scan Button Background to match!
                 Rectangle {
                     width: 36
                     height: 36
                     radius: 18
-                    color: scanArea.containsMouse ? Colors.bg2 : "transparent"
+                    color: scanArea.containsMouse ? Colors.bg2 : Colors.bg1
+                    border.color: Colors.bg3
+                    border.width: 1
+
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: 150
+                        }
+                    }
 
                     Text {
                         anchors.centerIn: parent
@@ -353,8 +367,8 @@ Item {
                         radius: 12
                         clip: true
 
-                        color: model.isActive ? Colors.bg2 : (btMouseArea.containsMouse ? Colors.bg2 : Colors.bg1)
-                        border.color: model.isActive ? Colors.aqua : (btMouseArea.containsMouse ? Colors.bg3 : Colors.bg2)
+                        color: model.isActive ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.15) : (btMouseArea.containsMouse ? Colors.bg3 : Colors.bg2)
+                        border.color: model.isActive ? Colors.aqua : (btMouseArea.containsMouse ? Colors.fg3 : Colors.bg3)
                         border.width: 1
 
                         Behavior on height {
@@ -364,6 +378,11 @@ Item {
                             }
                         }
                         Behavior on color {
+                            ColorAnimation {
+                                duration: 150
+                            }
+                        }
+                        Behavior on border.color {
                             ColorAnimation {
                                 duration: 150
                             }
@@ -430,9 +449,11 @@ Item {
                                     width: (parent.width - 12) / 2
                                     height: 36
                                     radius: 8
+
                                     color: model.isActive ? (connArea.containsMouse ? Colors.bg3 : Colors.bg2) : (connArea.containsMouse ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.8) : Colors.aqua)
                                     border.color: model.isActive ? Colors.bg3 : Colors.aqua
                                     border.width: 1
+
                                     Behavior on color {
                                         ColorAnimation {
                                             duration: 150
@@ -501,8 +522,6 @@ Item {
                                                 }
                                             }
 
-                                            // THE FIX: Automatically jump-starts a scan right after forgetting a device
-                                            // so it can instantly find it again when put in pairing mode!
                                             toggleScan(true);
                                         }
                                     }

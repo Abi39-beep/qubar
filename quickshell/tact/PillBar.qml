@@ -19,7 +19,10 @@ PanelWindow {
 
     // --- THE HYPRLAND MARGIN FIX ---
     WlrLayershell.exclusiveZone: Config.alwaysShowPill ? (Config.pillHeight + Config.topMargin) : 0
-    WlrLayershell.layer: WlrLayer.Top
+
+    // THE WAYLAND LAYER BOUNCE FIX:
+    property bool isBouncing: false
+    WlrLayershell.layer: pillWindow.isBouncing ? WlrLayer.Bottom : WlrLayer.Top
 
     // === THE NOTIFICATION SERVER ===
     NotificationServer {
@@ -28,12 +31,13 @@ PanelWindow {
             notification.tracked = true;
             pillWindow.currentNotification = notification;
             pillWindow.isNotifying = true;
-            pill.forceActiveFocus();
+            // THE FIX: Removed forceActiveFocus() here because our state machine handles it perfectly now!
         }
     }
 
     // === NOTIFICATION FOCUS ===
-    WlrLayershell.keyboardFocus: (pillWindow.viewState === 1 || pillWindow.viewState === 3 || pillWindow.viewState === 4 || pillWindow.viewState === 5 || pillWindow.viewState === 7 || pillWindow.isNotifying) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    property bool holdExclusiveFocus: false
+    WlrLayershell.keyboardFocus: holdExclusiveFocus ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // --- THE ULTIMATE WAYLAND MASK FIX ---
     implicitWidth: Math.max(Config.expandedWidth, Config.launcherWidth, Config.powerMenuWidth, 600) + 50
@@ -47,20 +51,55 @@ PanelWindow {
     }
 
     property int viewState: 0
-
-    onViewStateChanged: {
-        // THE FIX: The pill is now the absolute dictator. It ALWAYS holds the focus for state 7.
-        if (viewState === 1 || viewState === 3 || viewState === 4 || viewState === 5 || viewState === 7) {
-            pill.forceActiveFocus();
-        } else if (viewState === 0 && !pillWindow.isNotifying) {
-            pill.focus = false;
-        }
-    }
-
-    // === NOTIFICATION STATE VARIABLES ===
     property bool isNotifying: false
     property var currentNotification: null
 
+    // --- THE MASTER WAYLAND FOCUS STATE MACHINE ---
+    Timer {
+        id: focusDelayTimer
+        interval: 50
+        onTriggered: pill.forceActiveFocus()
+    }
+
+    Timer {
+        id: dropFocusTimer
+        interval: 350
+        onTriggered: {
+            pillWindow.holdExclusiveFocus = false;
+            pillWindow.isBouncing = true;
+            layerBounceTimer.restart();
+        }
+    }
+
+    Timer {
+        id: layerBounceTimer
+        interval: 50
+        onTriggered: pillWindow.isBouncing = false
+    }
+
+    // THE FIX: A unified function to handle focus for BOTH Menus and Notifications!
+    function updateFocusState() {
+        let isOpen = (viewState === 1 || viewState === 3 || viewState === 4 || viewState === 5 || viewState === 7 || isNotifying);
+
+        if (isOpen) {
+            dropFocusTimer.stop();
+            layerBounceTimer.stop();
+            pillWindow.isBouncing = false;
+
+            pillWindow.holdExclusiveFocus = true;
+            focusDelayTimer.restart();
+        } else {
+            pill.focus = false;
+            focusDelayTimer.stop();
+            dropFocusTimer.restart();
+        }
+    }
+
+    // Triggers the focus engine if you open a menu OR if a notification pops up!
+    onViewStateChanged: updateFocusState()
+    onIsNotifyingChanged: updateFocusState()
+
+    // ==========================================
     property var activeWorkspaces: []
     property bool hasWindows: false
 
@@ -285,14 +324,14 @@ PanelWindow {
         border.color: Colors.bg2
         border.width: 2
 
-        // --- THE MASTER ESCAPE KEY FIX ---
+        // --- MASTER KEYBOARD CONTROLLER ---
+        // Your escape key logic remains completely untouched and safe:
         Keys.onEscapePressed: {
             if (pillWindow.isNotifying) {
                 if (pillWindow.currentNotification)
                     pillWindow.currentNotification.dismiss();
                 pillWindow.isNotifying = false;
             } else if (pillWindow.viewState === 7) {
-                // THE FIX: Now checks for BOTH Wi-Fi (1) and Bluetooth (2)!
                 if (controlCenter.currentView === 1 || controlCenter.currentView === 2) {
                     controlCenter.currentView = 0;
                 } else {
@@ -303,6 +342,24 @@ PanelWindow {
             } else if (pillWindow.viewState === 1 || pillWindow.viewState === 4 || pillWindow.viewState === 5) {
                 pillWindow.viewState = 0;
             }
+        }
+
+        // These new shortcuts safely run alongside Escape without interfering:
+        Keys.onLeftPressed: {
+            if (pillWindow.viewState === 4)
+                powerMenu.moveLeft();
+        }
+        Keys.onRightPressed: {
+            if (pillWindow.viewState === 4)
+                powerMenu.moveRight();
+        }
+        Keys.onReturnPressed: {
+            if (pillWindow.viewState === 4)
+                powerMenu.executeSelected();
+        }
+        Keys.onEnterPressed: {
+            if (pillWindow.viewState === 4)
+                powerMenu.executeSelected();
         }
 
         MouseArea {

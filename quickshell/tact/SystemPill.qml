@@ -11,7 +11,22 @@ Rectangle {
     width: sysContent.width + Config.sysPillPadding
     height: Config.sysPillHeight
     radius: Config.sysPillRadius
-    color: Colors.bg2
+
+    // THE FIX: Smoothly shifts to bg3 when hovered!
+    color: hoverArea.containsMouse ? Colors.bg3 : Colors.bg2
+    Behavior on color {
+        ColorAnimation {
+            duration: 150
+        }
+    }
+
+    // THE MAGIC HOVER DETECTOR
+    MouseArea {
+        id: hoverArea
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton // Ignores clicks so PillBar can still open the Control Center!
+    }
 
     // --- 1. NATIVE BATTERY LOGIC ---
     readonly property int batLevel: UPower.displayDevice?.ready ? Math.round(UPower.displayDevice.percentage * 100) : 0

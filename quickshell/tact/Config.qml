@@ -150,8 +150,8 @@ QtObject {
     readonly property int notifBarBottomMargin: 8
 
     // --- Control Center Settings ---
-    readonly property int ccWidth: 420  // Increased width to fit the wide buttons
-    readonly property int ccHeight: 350 // Adjusted height to fit the new layout perfectly
+    readonly property int ccWidth: 400  // Increased width to fit the wide buttons
+    readonly property int ccHeight: 340 // Adjusted height to fit the new layout perfectly
     readonly property int ccRadius: 24
 
     // Internal Spacing
@@ -159,14 +159,14 @@ QtObject {
     readonly property int ccSpacing: 16
 
     // Toggle Buttons (Wide Pill Style)
-    readonly property int ccToggleHeight: 64
+    readonly property int ccToggleHeight: 60
     readonly property int ccToggleRadius: ccToggleHeight / 2 // This makes them perfect pills!
     readonly property int fontSizeCcToggleIcon: 20
     readonly property int fontSizeCcToggleTitle: 14
     readonly property int fontSizeCcToggleSub: 11
 
     // Sliders
-    readonly property int ccSliderHeight: 48
+    readonly property int ccSliderHeight: 40
     readonly property int ccSliderRadius: 24
-    readonly property int fontSizeCcSliderIcon: 18
+    readonly property int fontSizeCcSliderIcon: 20
 }

@@ -2,27 +2,31 @@ pragma Singleton
 import QtQuick
 
 QtObject {
-    readonly property color bg0: "#1A171C"
-    readonly property color bg1: "#221C22"
-    readonly property color bg2: "#322932"
-    readonly property color bg3: "#453845"
-    readonly property color bg4: "#584958"
+    // Background colors
+    readonly property color bg0: "#040e0d"
+    readonly property color bg1: "#0a1816"
+    readonly property color bg2: "#0f211f"
+    readonly property color bg3: "#152a26"
+    readonly property color bg4: "#1d3631"
 
-    readonly property color red: "#DD3014"
-    readonly property color orange: "#D87948"
-    readonly property color yellow: "#D3A03B"
-    readonly property color green: "#5B7035"
-    readonly property color aqua: "#157F78"
-    readonly property color blue: "#4A8494"
-    readonly property color purple: "#734F70"
+    // Foreground colors (fg1-fg3 derived from fg for compatibility with your setup)
+    readonly property color fg: "#f5e2c5"
+    readonly property color fg0: "#f5e2c5"
+    readonly property color fg1: "#e1cdb0"
+    readonly property color fg2: "#cdb99c"
+    readonly property color fg3: "#baa68a"
 
-    readonly property color fg: "#EEDDBB"
-    readonly property color fg0: "#EEDDBB"
-    readonly property color fg1: "#E3CEAD"
-    readonly property color fg2: "#CBB28F"
-    readonly property color fg3: "#A88D6F"
+    // Accent colors
+    readonly property color red: "#ff6048"
+    readonly property color orange: "#ffa478"
+    readonly property color yellow: "#f5cd5b"
+    readonly property color green: "#7ad9a8"
+    readonly property color aqua: "#3dd1b0"
+    readonly property color blue: "#5fc8d4"
+    readonly property color purple: "#e89aa8"
 
-    readonly property color grey0: "#A88D6F"
-    readonly property color grey1: "#CBB28F"
-    readonly property color grey2: "#E3CEAD"
+    // Greyscale colors
+    readonly property color grey0: "#3a1a35"
+    readonly property color grey1: "#5a4d3e"
+    readonly property color grey2: "#c4b09a"
 }

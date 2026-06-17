@@ -165,13 +165,21 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 12
 
+                // THE FIX: Premium Back Button Background
                 Rectangle {
                     width: 36
                     height: 36
                     radius: 18
-                    color: backArea.containsMouse ? Colors.bg2 : "transparent"
-                    border.color: Colors.bg2
+                    color: backArea.containsMouse ? Colors.bg2 : Colors.bg1
+                    border.color: Colors.bg3
                     border.width: 1
+
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: 150
+                        }
+                    }
+
                     Text {
                         anchors.centerIn: parent
                         text: "󰁍"
@@ -203,11 +211,20 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
 
+                // THE FIX: Premium Scan Button Background
                 Rectangle {
                     width: 36
                     height: 36
                     radius: 18
-                    color: scanArea.containsMouse ? Colors.bg2 : "transparent"
+                    color: scanArea.containsMouse ? Colors.bg2 : Colors.bg1
+                    border.color: Colors.bg3
+                    border.width: 1
+
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: 150
+                        }
+                    }
 
                     Text {
                         anchors.centerIn: parent
@@ -322,7 +339,6 @@ Item {
                         width: parent.width
                         property bool isExpanded: wifiMenuRoot.expandedSsid === model.ssid
 
-                        // THE FIX: Automatically clear password and reset eye icon when closing!
                         onIsExpandedChanged: {
                             if (!isExpanded) {
                                 passInput.text = "";
@@ -334,8 +350,9 @@ Item {
                         radius: 12
                         clip: true
 
-                        color: model.isActive ? Colors.bg2 : (netMouseArea.containsMouse ? Colors.bg2 : Colors.bg1)
-                        border.color: model.isActive ? Colors.aqua : (netMouseArea.containsMouse ? Colors.bg3 : Colors.bg2)
+                        // THE FIX: Increased contrast! Connected networks get the Aqua glow, others get distinct bg2/bg3 cards!
+                        color: model.isActive ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.15) : (netMouseArea.containsMouse ? Colors.bg3 : Colors.bg2)
+                        border.color: model.isActive ? Colors.aqua : (netMouseArea.containsMouse ? Colors.fg3 : Colors.bg3)
                         border.width: 1
 
                         Behavior on height {
@@ -345,6 +362,11 @@ Item {
                             }
                         }
                         Behavior on color {
+                            ColorAnimation {
+                                duration: 150
+                            }
+                        }
+                        Behavior on border.color {
                             ColorAnimation {
                                 duration: 150
                             }
@@ -413,7 +435,7 @@ Item {
 
                             // A. PASSWORD BOX
                             Column {
-                                id: passCol // Given an ID so it can be reset!
+                                id: passCol
                                 anchors.fill: parent
                                 anchors.margins: 12
                                 anchors.topMargin: 0
@@ -543,7 +565,6 @@ Item {
                                             duration: 150
                                         }
                                     }
-
                                     Text {
                                         anchors.centerIn: parent
                                         text: "Forget"

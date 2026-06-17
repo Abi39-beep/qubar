@@ -69,7 +69,6 @@ Rectangle {
         }
     }
 
-    // THE FIX: If "On" but disconnected, return 1.0 (Fully solid/opaque)
     function getWifiOpacity(sig) {
         if (root.currentSsid === "")
             return 1.0;
@@ -79,7 +78,7 @@ Rectangle {
             return 0.75;
         if (sig > 25)
             return 0.50;
-        return 0.35; // Kept above 0.15 so it never looks washed out!
+        return 0.35;
     }
 
     Row {
@@ -92,7 +91,8 @@ Rectangle {
             height: parent.height
             radius: width / 2
 
-            color: root.isRadioOn ? (circleArea.containsMouse ? Qt.rgba(0, 0, 0, 0.25) : Qt.rgba(0, 0, 0, 0.15)) : (circleArea.containsMouse ? Colors.bg2 : Colors.bg1)
+            // THE FIX: Cranked up the black overlay from 0.15 to 0.30 so it clearly pops against the aqua!
+            color: root.isRadioOn ? (circleArea.containsMouse ? Qt.rgba(0, 0, 0, 0.45) : Qt.rgba(0, 0, 0, 0.30)) : (circleArea.containsMouse ? Colors.bg3 : Colors.bg2)
 
             Behavior on color {
                 ColorAnimation {
@@ -106,7 +106,6 @@ Rectangle {
                 font.family: Config.fontName
                 font.pixelSize: Config.fontSizeCcToggleIcon
 
-                // THE FIX: Color is strictly bg0, and opacity stays solid when ON!
                 color: root.isRadioOn ? Colors.bg0 : Colors.fg0
                 opacity: root.isRadioOn ? root.getWifiOpacity(root.currentSignal) : 0.6
                 Behavior on opacity {

@@ -20,12 +20,21 @@ Item {
         return listHeight > 0 ? (baseHeight + listHeight) : baseHeight;
     }
 
+    // THE FIX: Wait for PillBar to finish its focus grab, then put the cursor in the search box!
+    Timer {
+        id: focusStealTimer
+        interval: 100
+        onTriggered: searchInput.forceActiveFocus()
+    }
+
     onVisibleChanged: {
         if (visible) {
             searchInput.text = "";
-            searchInput.forceActiveFocus();
             appList.contentY = 0;
             appList.currentIndex = 0;
+            focusStealTimer.restart(); // Triggers the delayed focus
+        } else {
+            focusStealTimer.stop();
         }
     }
 

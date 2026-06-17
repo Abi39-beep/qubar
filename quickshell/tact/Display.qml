@@ -4,9 +4,17 @@ Rectangle {
     id: root
     height: Config.ccToggleHeight
     radius: Config.ccToggleRadius
-    color: Colors.bg0
+
+    // THE FIX: Premium background hover transition instead of element-wide opacity drops
+    color: mouseArea.containsMouse ? Colors.bg1 : Colors.bg0
     border.color: Colors.bg3
     border.width: 1
+
+    Behavior on color {
+        ColorAnimation {
+            duration: 150
+        }
+    }
 
     Row {
         anchors.verticalCenter: parent.verticalCenter
@@ -42,10 +50,9 @@ Rectangle {
     }
 
     MouseArea {
+        id: mouseArea
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onEntered: parent.opacity = 0.8
-        onExited: parent.opacity = 1.0
     }
 }

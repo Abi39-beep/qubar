@@ -23,10 +23,14 @@ Item {
                 bindsRoot.target.viewState = (bindsRoot.target.viewState === 4) ? 0 : 4;
         }
 
-        // --- NEW: App Launcher Command ---
         function toggleLauncher(): void {
             if (bindsRoot.target)
                 bindsRoot.target.viewState = (bindsRoot.target.viewState === 5) ? 0 : 5;
+        }
+
+        function toggleControlCenter(): void {
+            if (bindsRoot.target)
+                bindsRoot.target.viewState = (bindsRoot.target.viewState === 7) ? 0 : 7;
         }
 
         function closePill(): void {

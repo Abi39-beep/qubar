@@ -10,7 +10,6 @@ Column {
     property int volumeVal: 50
     property bool volumeMuted: false
 
-    // THE FIX: Increased to 300ms to guarantee the layout is completely finished drawing!
     property bool isReady: false
     onVisibleChanged: {
         if (visible) {
@@ -111,23 +110,18 @@ Column {
         return "󰕿";
     }
 
-    function getBriIcon(val) {
-        if (val > 66)
-            return "󰃠";
-        if (val > 33)
-            return "󰃟";
-        return "󰃞";
-    }
-
     // ==========================================
     // 3. BRIGHTNESS SLIDER UI
     // ==========================================
     Rectangle {
+        id: briSlider
         width: parent.width
         height: Config.ccSliderHeight
         radius: height / 2
-        color: Colors.bg1
-        border.color: Colors.bg2
+
+        // THE FIX: Increased contrast so the track is visible against the Control Center!
+        color: Colors.bg2
+        border.color: Colors.bg3
         border.width: 1
 
         property real fillWidth: parent.width * (root.brightnessVal / 100)
@@ -137,9 +131,9 @@ Column {
             height: parent.height
             radius: height / 2
 
+            // If empty, perfectly matches the new track background
             color: root.brightnessVal === 0 ? Colors.bg2 : Colors.aqua
 
-            // THE FIX: "duration: 0" forces an instant mathematical snap with zero visual tearing!
             Behavior on width {
                 NumberAnimation {
                     duration: root.isReady ? 150 : 0
@@ -153,14 +147,38 @@ Column {
             }
         }
 
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
+        // PERFECT CENTERING CONTAINER
+        Item {
             anchors.left: parent.left
-            anchors.leftMargin: (parent.height - paintedWidth) / 2
-            text: root.getBriIcon(root.brightnessVal)
-            font.family: Config.fontName
-            font.pixelSize: Config.fontSizeCcSliderIcon
-            color: Colors.bg0
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.height
+            height: parent.height
+
+            Text {
+                anchors.centerIn: parent
+                text: "󰖨"
+                font.family: Config.fontName
+
+                font.pixelSize: (Config.fontSizeCcSliderIcon - 6) + (root.brightnessVal / 100 * 6)
+                color: briSlider.fillWidth > 40 ? Colors.bg0 : Colors.fg0
+                rotation: root.brightnessVal * 1.8
+
+                Behavior on font.pixelSize {
+                    NumberAnimation {
+                        duration: root.isReady ? 150 : 0
+                    }
+                }
+                Behavior on rotation {
+                    NumberAnimation {
+                        duration: root.isReady ? 150 : 0
+                    }
+                }
+                Behavior on color {
+                    ColorAnimation {
+                        duration: root.isReady ? 150 : 0
+                    }
+                }
+            }
         }
 
         MouseArea {
@@ -190,11 +208,14 @@ Column {
     // 4. VOLUME SLIDER UI
     // ==========================================
     Rectangle {
+        id: volSlider
         width: parent.width
         height: Config.ccSliderHeight
         radius: height / 2
-        color: Colors.bg1
-        border.color: Colors.bg2
+
+        // THE FIX: Increased contrast so the track is visible against the Control Center!
+        color: Colors.bg2
+        border.color: Colors.bg3
         border.width: 1
 
         property real fillWidth: parent.width * (root.volumeVal / 100)
@@ -204,9 +225,9 @@ Column {
             height: parent.height
             radius: height / 2
 
+            // If empty, perfectly matches the new track background
             color: root.volumeMuted || root.volumeVal === 0 ? Colors.bg2 : Colors.aqua
 
-            // THE FIX: "duration: 0" forces an instant mathematical snap with zero visual tearing!
             Behavior on width {
                 NumberAnimation {
                     duration: root.isReady ? 150 : 0
@@ -220,14 +241,26 @@ Column {
             }
         }
 
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
+        // PERFECT CENTERING CONTAINER
+        Item {
             anchors.left: parent.left
-            anchors.leftMargin: (parent.height - paintedWidth) / 2
-            text: root.getVolIcon(root.volumeVal, root.volumeMuted)
-            font.family: Config.fontName
-            font.pixelSize: Config.fontSizeCcSliderIcon
-            color: Colors.bg0
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.height
+            height: parent.height
+
+            Text {
+                anchors.centerIn: parent
+                text: root.getVolIcon(root.volumeVal, root.volumeMuted)
+                font.family: Config.fontName
+                font.pixelSize: Config.fontSizeCcSliderIcon
+                color: volSlider.fillWidth > 40 ? Colors.bg0 : Colors.fg0
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: root.isReady ? 150 : 0
+                    }
+                }
+            }
         }
 
         MouseArea {
