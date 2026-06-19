@@ -1,0 +1,214 @@
+:root {
+    --bg-crust: #1A171C;
+    --bg-base: #221C22;
+    --bg-surface: #322932;
+    --fg-text: #EEDDBB;
+    --fg-muted: #A88D6F;
+    --accent: #5B7035;
+    --border: #584958;
+}
+
+/* ========================================================
+   BASE FIREFOX UI ENGINE (FINAL FIX)
+======================================================== */
+/* 1. Main UI Backgrounds */
+#navigator-toolbox,
+#titlebar,
+#TabsToolbar {
+    background: var(--bg-crust) !important;
+    border: none !important;
+}
+
+#nav-bar,
+#PersonalToolbar,
+findbar {
+    background: var(--bg-base) !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--fg-text) !important;
+}
+
+/* 2. TABS (MODERN FLOATING PILL DESIGN) */
+.tabbrowser-tab {
+    padding: 4px 2px !important;
+}
+
+.tab-background {
+    border-radius: 8px !important;
+    margin-bottom: 0px !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    transition: all 0.2s ease !important;
+}
+
+.tabbrowser-tab:not([selected="true"]) {
+    opacity: 0.5 !important;
+}
+
+.tabbrowser-tab:not([selected="true"]):hover {
+    opacity: 0.9 !important;
+}
+
+.tabbrowser-tab:not([selected="true"]):hover .tab-background {
+    background: var(--bg-base) !important;
+}
+
+.tabbrowser-tab:not([selected="true"]) .tab-label {
+    color: var(--fg-text) !important;
+    font-weight: 500 !important;
+}
+
+.tabbrowser-tab[selected="true"] .tab-background {
+    background: var(--bg-surface) !important;
+    box-shadow: 0 -2px 0 0 var(--accent) inset !important;
+}
+
+.tabbrowser-tab[selected="true"] .tab-label {
+    color: var(--accent) !important;
+    font-weight: 700 !important;
+}
+
+.tab-close-button {
+    color: var(--fg-text) !important;
+}
+
+/* ========================================================
+   3. URL BAR & DROPDOWN (TYPING/SEARCH FIXES)
+======================================================== */
+#urlbar-background {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+}
+
+/* FIX 1: Keep background color when clicking/typing */
+#urlbar[focused="true"]>#urlbar-background,
+#urlbar[open]>#urlbar-background {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--accent) !important;
+    box-shadow: 0 0 5px var(--bg-crust) !important;
+}
+
+#urlbar-input-container,
+#urlbar-input {
+    color: var(--fg-text) !important;
+}
+
+/* FIX 2: Highlighted text color when selecting text in the URL bar */
+#urlbar-input::selection {
+    background-color: var(--accent) !important;
+    color: var(--bg-crust) !important;
+}
+
+/* Fix for inner buttons (Identity box/Shield) */
+#identity-box,
+#identity-permission-box,
+.identity-box-button,
+#tracking-protection-icon-container,
+#urlbar-search-button {
+    background-color: transparent !important;
+}
+
+#identity-box:hover,
+.identity-box-button:hover,
+#tracking-protection-icon-container:hover {
+    background-color: var(--bg-base) !important;
+    border-radius: 6px !important;
+}
+
+#identity-box::after {
+    display: none !important;
+}
+
+/* URL Dropdown Container */
+.urlbarView {
+    background: var(--bg-surface) !important;
+    color: var(--fg-text) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    margin-top: 4px !important;
+}
+
+.urlbarView-row:hover>.urlbarView-row-inner,
+.urlbarView-row[selected]>.urlbarView-row-inner {
+    background: var(--bg-base) !important;
+}
+
+.urlbarView-url {
+    color: var(--accent) !important;
+}
+
+/* FIX 3: The "Search with..." bar at the very bottom of the dropdown */
+#urlbar .search-one-offs {
+    background-color: var(--bg-base) !important;
+    border-top: 1px solid var(--border) !important;
+    padding: 4px !important;
+}
+
+/* ========================================================
+   4. BUTTONS, MENUS, & SCROLLBARS
+======================================================== */
+.toolbarbutton-icon {
+    fill: var(--fg-text) !important;
+}
+
+.toolbarbutton-1:hover>.toolbarbutton-icon,
+.toolbarbutton-1:hover>.toolbarbutton-badge-stack {
+    background: var(--bg-surface) !important;
+    border-radius: 8px !important;
+}
+
+menupopup,
+panel,
+.panel-arrowcontainer {
+    --panel-background: var(--bg-base) !important;
+    --panel-color: var(--fg-text) !important;
+    --panel-border-color: var(--border) !important;
+    border-radius: 8px !important;
+}
+
+menu:hover,
+menuitem:hover,
+.subviewbutton:hover {
+    background: var(--accent) !important;
+    color: var(--bg-crust) !important;
+}
+
+#sidebar-box,
+#sidebar-header,
+#sidebar {
+    background: var(--bg-crust) !important;
+    color: var(--fg-text) !important;
+    border-right: 1px solid var(--border) !important;
+}
+
+* {
+    scrollbar-color: var(--border) var(--bg-crust) !important;
+}
+
+/* ========================================================
+   KILL THE GREY "MEGABAR" TYPING BOX
+======================================================== */
+#urlbar {
+    --toolbar-field-focus-background-color: var(--bg-surface) !important;
+}
+
+#urlbar[breakout][breakout-extend] {
+    background-color: transparent !important;
+}
+
+#urlbar[breakout][breakout-extend]>#urlbar-background {
+    background-color: var(--bg-surface) !important;
+    border: 1px solid var(--accent) !important;
+}
+
+#urlbar[breakout][breakout-extend]>#urlbar-input-container {
+    background-color: transparent !important;
+}
+
+/* Ensure the text box itself doesn't hold a hidden background */
+.urlbar-input-box,
+#urlbar-input {
+    background-color: transparent !important;
+}

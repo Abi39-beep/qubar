@@ -1,0 +1,12 @@
+/**
+ * Custom Colors - Rofi Colors
+ **/
+
+* {
+    background:     #040e0dAA;
+    background-alt: #0f211fFF;
+    foreground:     #f5e2c5FF;
+    selected:       #3dd1b0FF;
+    active:         #7ad9a8FF;
+    urgent:         #ff6048FF;
+}

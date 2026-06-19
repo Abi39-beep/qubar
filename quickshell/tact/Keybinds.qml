@@ -29,8 +29,37 @@ Item {
         }
 
         function toggleControlCenter(): void {
-            if (bindsRoot.target)
-                bindsRoot.target.viewState = (bindsRoot.target.viewState === 7) ? 0 : 7;
+            if (bindsRoot.target) {
+                // Uses the new 'cc' alias to ensure it defaults to the main grid!
+                if (bindsRoot.target.viewState === 7 && bindsRoot.target.cc.currentView === 0) {
+                    bindsRoot.target.viewState = 0;
+                } else {
+                    bindsRoot.target.viewState = 7;
+                    bindsRoot.target.cc.currentView = 0;
+                }
+            }
+        }
+
+        function toggleSettings(): void {
+            if (bindsRoot.target) {
+                if (bindsRoot.target.viewState === 7 && bindsRoot.target.cc.currentView === 3) {
+                    bindsRoot.target.viewState = 0;
+                } else {
+                    bindsRoot.target.viewState = 7;
+                    bindsRoot.target.cc.currentView = 3;
+                }
+            }
+        }
+
+        function toggleTheme(): void {
+            if (bindsRoot.target) {
+                if (bindsRoot.target.viewState === 7 && bindsRoot.target.cc.currentView === 4) {
+                    bindsRoot.target.viewState = 0;
+                } else {
+                    bindsRoot.target.viewState = 7;
+                    bindsRoot.target.cc.currentView = 4;
+                }
+            }
         }
 
         function closePill(): void {

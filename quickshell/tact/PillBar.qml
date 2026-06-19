@@ -53,6 +53,7 @@ PanelWindow {
     property int viewState: 0
     property bool isNotifying: false
     property var currentNotification: null
+    property alias cc: controlCenter
 
     // --- THE MASTER WAYLAND FOCUS STATE MACHINE ---
     Timer {
@@ -332,7 +333,9 @@ PanelWindow {
                     pillWindow.currentNotification.dismiss();
                 pillWindow.isNotifying = false;
             } else if (pillWindow.viewState === 7) {
-                if (controlCenter.currentView === 1 || controlCenter.currentView === 2) {
+                if (controlCenter.currentView === 4) {
+                    controlCenter.currentView = 3;
+                } else if (controlCenter.currentView !== 0) {
                     controlCenter.currentView = 0;
                 } else {
                     pillWindow.viewState = 1;

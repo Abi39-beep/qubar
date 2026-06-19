@@ -2,25 +2,62 @@ import QtQuick
 import QtQuick.Controls.Basic
 import Quickshell
 import Quickshell.Widgets
+import Quickshell.Io
 
 Item {
     id: launcherRoot
     signal closeRequested
 
+    // --- MODE SWITCHER ---
+    // 0 = Apps, 1 = Clipboard
+    property bool isClipboardMode: false
+
+    // --- CLIPBOARD DATA ENGINE ---
+    property var allClips: []
+    property string clipBuffer: ""
+
+    Process {
+        id: clipProc
+        command: ["bash", "-c", "cliphist list | head -n 50"]
+        running: false
+        stdout: SplitParser {
+            onRead: data => {
+                clipBuffer += data + "\n";
+            }
+        }
+        onExited: {
+            let lines = clipBuffer.split("\n");
+            let tempArr = [];
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                if (!line)
+                    continue;
+
+                let sep = line.indexOf("\t");
+                if (sep > -1) {
+                    tempArr.push({
+                        clipId: line.substring(0, sep),
+                        content: line.substring(sep + 1).trim(),
+                        rawLine: line
+                    });
+                }
+            }
+            launcherRoot.allClips = tempArr;
+            clipBuffer = "";
+        }
+    }
+
     // --- SMART CONFIG-DRIVEN HEIGHT MATH ---
     property int dynamicHeight: {
-        let visibleItems = Math.min(appList.count, Config.launcherMaxItems);
+        let activeList = isClipboardMode ? clipList : appList;
+        let visibleItems = Math.min(activeList.count, Config.launcherMaxItems);
 
-        // Item height + 6px spacing between items
         let listHeight = visibleItems > 0 ? (visibleItems * (Config.appItemHeight + 6)) - 6 : 0;
-
-        // 56px = 20px top margin + 16px column spacing + 20px bottom margin
         let baseHeight = Config.searchBarHeight + 56;
 
         return listHeight > 0 ? (baseHeight + listHeight) : baseHeight;
     }
 
-    // THE FIX: Wait for PillBar to finish its focus grab, then put the cursor in the search box!
     Timer {
         id: focusStealTimer
         interval: 100
@@ -29,10 +66,18 @@ Item {
 
     onVisibleChanged: {
         if (visible) {
+            isClipboardMode = false;
             searchInput.text = "";
             appList.contentY = 0;
             appList.currentIndex = 0;
-            focusStealTimer.restart(); // Triggers the delayed focus
+            clipList.contentY = 0;
+            clipList.currentIndex = 0;
+
+            clipBuffer = "";
+            clipProc.running = false;
+            clipProc.running = true;
+
+            focusStealTimer.restart();
         } else {
             focusStealTimer.stop();
         }
@@ -50,8 +95,10 @@ Item {
             height: Config.searchBarHeight
             radius: Config.searchBarRadius
             color: Colors.bg2
-            border.color: searchInput.activeFocus ? Colors.green : Colors.bg3
+            border.color: searchInput.activeFocus ? (isClipboardMode ? Colors.aqua : Colors.green) : Colors.bg3
             border.width: 2
+
+            property bool showClear: isClipboardMode && launcherRoot.allClips.length > 0
 
             Behavior on border.color {
                 ColorAnimation {
@@ -66,10 +113,10 @@ Item {
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: ""
+                    text: isClipboardMode ? "󰅍" : ""
                     font.family: Config.fontName
                     font.pixelSize: Config.fontSizeSearchIcon
-                    color: searchInput.activeFocus ? Colors.green : Colors.fg2
+                    color: searchInput.activeFocus ? (isClipboardMode ? Colors.aqua : Colors.green) : Colors.fg2
                     Behavior on color {
                         ColorAnimation {
                             duration: 150
@@ -80,71 +127,115 @@ Item {
                 TextField {
                     id: searchInput
                     anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - (Config.fontSizeSearchIcon + 20)
+                    // Dynamically adjusts text field width if the clear icon is visible
+                    width: parent.width - (Config.fontSizeSearchIcon + 24) - (searchBar.showClear ? 40 : 0)
                     color: Colors.fg0
                     font.family: Config.fontName
                     font.pixelSize: Config.fontSizeSearchInput
                     background: null
-                    placeholderText: "Search apps or run command..."
+
+                    placeholderText: isClipboardMode ? "Search clipboard... (Tab to switch)" : "Search apps... (Tab to switch)"
                     placeholderTextColor: Colors.bg4
 
-                    onTextChanged: appList.currentIndex = 0
+                    onTextChanged: {
+                        appList.currentIndex = 0;
+                        clipList.currentIndex = 0;
+                    }
 
                     Keys.onPressed: event => {
+                        let activeList = isClipboardMode ? clipList : appList;
+
                         if (event.key === Qt.Key_Down) {
-                            if (appList.currentIndex < appList.count - 1) {
-                                appList.currentIndex++;
+                            if (activeList.currentIndex < activeList.count - 1) {
+                                activeList.currentIndex++;
                             }
                             event.accepted = true;
                         } else if (event.key === Qt.Key_Up) {
-                            if (appList.currentIndex > 0) {
-                                appList.currentIndex--;
+                            if (activeList.currentIndex > 0) {
+                                activeList.currentIndex--;
                             }
                             event.accepted = true;
                         } else if (event.key === Qt.Key_Escape) {
                             launcherRoot.closeRequested();
                             event.accepted = true;
+                        } else if (event.key === Qt.Key_Tab) {
+                            isClipboardMode = !isClipboardMode;
+                            event.accepted = true;
                         }
                     }
 
                     onAccepted: {
-                        if (appList.count > 0 && appList.currentIndex >= 0) {
-                            appList.currentItem.trigger();
-                        } else if (text.trim() !== "") {
-                            // Raw text typed in the bar uses Bash
+                        let activeList = isClipboardMode ? clipList : appList;
+
+                        if (activeList.count > 0 && activeList.currentIndex >= 0) {
+                            activeList.currentItem.trigger();
+                        } else if (!isClipboardMode && text.trim() !== "") {
                             Quickshell.execDetached(["bash", "-c", text.trim()]);
                             launcherRoot.closeRequested();
                         }
                     }
                 }
             }
+
+            // --- THE INTEGRATED CLEAR ALL ICON ---
+            Rectangle {
+                anchors.right: parent.right
+                anchors.rightMargin: 6
+                anchors.verticalCenter: parent.verticalCenter
+                width: 32
+                height: 32
+                radius: 6
+
+                visible: searchBar.showClear
+                color: clearArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "󰃢" // The Broom Icon
+                    color: clearArea.containsMouse ? Colors.red : Colors.fg2
+                    font.family: Config.fontName
+                    font.pixelSize: 16
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: 150
+                        }
+                    }
+                }
+
+                MouseArea {
+                    id: clearArea
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    hoverEnabled: true
+                    onClicked: {
+                        Quickshell.execDetached(["cliphist", "wipe"]);
+                        launcherRoot.allClips = [];
+                        searchInput.forceActiveFocus();
+                    }
+                }
+            }
         }
 
-        // --- THE DYNAMIC NATIVE APP LIST ---
+        // --- LIST 1: APP LAUNCHER ---
         ListView {
             id: appList
             width: parent.width
             height: parent.height - searchBar.height - 16
             clip: true
             spacing: 6
+            visible: !isClipboardMode
 
             highlightFollowsCurrentItem: true
             currentIndex: 0
 
             model: ScriptModel {
                 objectProp: "id"
-
                 values: {
                     let search = searchInput.text.toLowerCase().trim();
                     let allApps = DesktopEntries.applications.values;
-
-                    if (search === "") {
+                    if (search === "")
                         return allApps;
-                    }
-
-                    return allApps.filter(function (app) {
-                        return app.name && app.name.toLowerCase().includes(search);
-                    });
+                    return allApps.filter(app => app.name && app.name.toLowerCase().includes(search));
                 }
             }
 
@@ -155,20 +246,15 @@ Item {
                 radius: Config.appItemRadius
 
                 property bool isSelected: ListView.isCurrentItem || appArea.containsMouse
-
                 color: isSelected ? Colors.bg2 : "transparent"
                 border.color: isSelected ? Colors.bg3 : "transparent"
                 border.width: 2
 
-                // --- THE PROVEN WORKING TRIGGER RESTORED ---
                 function trigger() {
                     let appName = modelData.name.toLowerCase();
-
-                    // Add any other specific terminal apps you use to this list!
                     let cliApps = ["htop", "btop", "yazi", "ranger", "lf", "cava", "ncmpcpp", "nvtop", "pulsemixer"];
                     let cliMatch = "";
 
-                    // Check if the app name contains any of your known terminal apps
                     for (let i = 0; i < cliApps.length; i++) {
                         if (appName.includes(cliApps[i])) {
                             cliMatch = cliApps[i];
@@ -177,14 +263,22 @@ Item {
                     }
 
                     if (cliMatch !== "") {
-                        // 1. Forcefully open known CLI apps natively using Config terminal!
                         Quickshell.execDetached([Config.terminalEmulator, "-e", cliMatch]);
                     } else {
-                        // 2. Normal GUI apps use Quickshell's native, guaranteed launcher
                         modelData.execute();
                     }
-
                     launcherRoot.closeRequested();
+                }
+
+                MouseArea {
+                    id: appArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        appList.currentIndex = index;
+                        delegateRect.trigger();
+                    }
                 }
 
                 Row {
@@ -206,22 +300,164 @@ Item {
                         font.family: Config.fontName
                         font.pixelSize: Config.fontSizeAppTitle
                         font.bold: true
-                        Behavior on color {
-                            ColorAnimation {
-                                duration: 150
-                            }
-                        }
                     }
+                }
+            }
+        }
+
+        // --- LIST 2: CLIPBOARD HISTORY ---
+        ListView {
+            id: clipList
+            width: parent.width
+            height: parent.height - searchBar.height - 16
+            clip: true
+            spacing: 6
+            visible: isClipboardMode
+
+            highlightFollowsCurrentItem: true
+            currentIndex: 0
+
+            model: ScriptModel {
+                objectProp: "clipId"
+                values: {
+                    let triggerUpdate = launcherRoot.allClips;
+                    let search = searchInput.text.toLowerCase().trim();
+                    if (search === "")
+                        return triggerUpdate;
+
+                    return triggerUpdate.filter(clip => clip.content.toLowerCase().includes(search));
+                }
+            }
+
+            delegate: Rectangle {
+                id: clipDelegateRect
+                width: ListView.view.width
+                height: Config.appItemHeight
+                radius: Config.appItemRadius
+
+                property bool isRowHovered: clipArea.containsMouse || copyHoverArea.containsMouse || delHoverArea.containsMouse
+                property bool isSelected: ListView.isCurrentItem || isRowHovered
+
+                color: isSelected ? Colors.bg2 : "transparent"
+                border.color: isSelected ? Colors.bg3 : "transparent"
+                border.width: 2
+
+                function trigger() {
+                    let safeLine = modelData.rawLine.replace(/'/g, "'\\''");
+                    Quickshell.execDetached(["bash", "-c", "echo -E '" + safeLine + "' | cliphist decode | wl-copy"]);
+                    launcherRoot.closeRequested();
                 }
 
                 MouseArea {
-                    id: appArea
+                    id: clipArea
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        appList.currentIndex = index;
-                        delegateRect.trigger();
+                        clipList.currentIndex = index;
+                        clipDelegateRect.trigger();
+                    }
+                }
+
+                Row {
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    spacing: 16
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "󰅍"
+                        color: clipDelegateRect.isSelected ? Colors.aqua : Colors.fg2
+                        font.family: Config.fontName
+                        font.pixelSize: 18
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - 110
+                        text: modelData.content
+                        color: clipDelegateRect.isSelected ? Colors.aqua : Colors.fg0
+                        font.family: Config.fontName
+                        font.pixelSize: Config.fontSizeAppTitle
+                        elide: Text.ElideRight
+                    }
+                }
+
+                // QUICK ACTION ICONS (COPY & DELETE)
+                Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.right: parent.right
+                    anchors.rightMargin: 12
+                    spacing: 8
+                    visible: clipDelegateRect.isRowHovered
+
+                    // COPY ICON
+                    Rectangle {
+                        id: copyIconRect
+                        width: 32
+                        height: 32
+                        radius: 6
+                        color: copyHoverArea.containsMouse ? Colors.bg3 : "transparent"
+
+                        property bool isCopied: false
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: copyIconRect.isCopied ? "󰄬" : "󰆏"
+                            color: copyIconRect.isCopied ? Colors.green : Colors.fg2
+                            font.family: Config.fontName
+                            font.pixelSize: 16
+                        }
+
+                        Timer {
+                            id: tickTimer
+                            interval: 1500
+                            onTriggered: copyIconRect.isCopied = false
+                        }
+
+                        MouseArea {
+                            id: copyHoverArea
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            hoverEnabled: true
+                            onClicked: {
+                                let safeLine = modelData.rawLine.replace(/'/g, "'\\''");
+                                Quickshell.execDetached(["bash", "-c", "echo -E '" + safeLine + "' | cliphist decode | wl-copy"]);
+
+                                copyIconRect.isCopied = true;
+                                tickTimer.restart();
+                                searchInput.forceActiveFocus();
+                            }
+                        }
+                    }
+
+                    // DELETE ICON
+                    Rectangle {
+                        width: 32
+                        height: 32
+                        radius: 6
+                        color: delHoverArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "󰆴"
+                            color: delHoverArea.containsMouse ? Colors.red : Colors.fg2
+                            font.family: Config.fontName
+                            font.pixelSize: 16
+                        }
+
+                        MouseArea {
+                            id: delHoverArea
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            hoverEnabled: true
+                            onClicked: {
+                                let safeLine = modelData.rawLine.replace(/'/g, "'\\''");
+                                Quickshell.execDetached(["bash", "-c", "echo -E '" + safeLine + "' | cliphist delete"]);
+                                launcherRoot.allClips = launcherRoot.allClips.filter(c => c.clipId !== modelData.clipId);
+                                searchInput.forceActiveFocus();
+                            }
+                        }
                     }
                 }
             }
