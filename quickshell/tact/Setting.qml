@@ -5,6 +5,7 @@ Item {
     id: settingRoot
     signal backRequested
     signal openThemeRequested
+    signal openWallpaperRequested // NEW SIGNAL!
 
     Column {
         anchors.fill: parent
@@ -61,20 +62,17 @@ Item {
             }
         }
 
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: Colors.bg3
-        }
+        // --- SETTINGS BUTTONS ---
 
-        // --- SETTINGS LIST ---
+        // 1. THEMES BUTTON
         Rectangle {
             width: parent.width
             height: 52
             radius: 12
-            color: themeBtnArea.containsMouse ? Colors.bg2 : Colors.bg1
-            border.color: themeBtnArea.containsMouse ? Colors.bg3 : Colors.bg2
+            color: themeBtnArea.containsMouse || activeFocus ? Colors.bg2 : Colors.bg1
+            border.color: themeBtnArea.containsMouse || activeFocus ? Colors.bg3 : Colors.bg2
             border.width: 1
+            focus: true // Allows keyboard navigation
 
             Behavior on color {
                 ColorAnimation {
@@ -89,7 +87,7 @@ Item {
                 spacing: 16
 
                 Text {
-                    text: "󰸉" // Paint palette icon
+                    text: "󰸉" // Paint palette
                     color: Colors.aqua
                     font.family: Config.fontName
                     font.pixelSize: 18
@@ -109,18 +107,78 @@ Item {
                 anchors.right: parent.right
                 anchors.rightMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
-                text: "󰅂" // Chevron right
+                text: "󰅂"
                 color: Colors.fg3
                 font.family: Config.fontName
                 font.pixelSize: 18
             }
 
+            Keys.onReturnPressed: settingRoot.openThemeRequested()
             MouseArea {
                 id: themeBtnArea
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
                 hoverEnabled: true
                 onClicked: settingRoot.openThemeRequested()
+            }
+        }
+
+        // 2. WALLPAPERS BUTTON
+        Rectangle {
+            width: parent.width
+            height: 52
+            radius: 12
+            color: wallBtnArea.containsMouse || activeFocus ? Colors.bg2 : Colors.bg1
+            border.color: wallBtnArea.containsMouse || activeFocus ? Colors.bg3 : Colors.bg2
+            border.width: 1
+            focus: true // Allows keyboard navigation
+
+            Behavior on color {
+                ColorAnimation {
+                    duration: 150
+                }
+            }
+
+            Row {
+                anchors.left: parent.left
+                anchors.leftMargin: 16
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 16
+
+                Text {
+                    text: "󰋩" // Image icon
+                    color: Colors.blue
+                    font.family: Config.fontName
+                    font.pixelSize: 18
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                Text {
+                    text: "Wallpapers"
+                    color: Colors.fg0
+                    font.family: Config.fontName
+                    font.pixelSize: 14
+                    font.bold: true
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
+            Text {
+                anchors.right: parent.right
+                anchors.rightMargin: 16
+                anchors.verticalCenter: parent.verticalCenter
+                text: "󰅂"
+                color: Colors.fg3
+                font.family: Config.fontName
+                font.pixelSize: 18
+            }
+
+            Keys.onReturnPressed: settingRoot.openWallpaperRequested()
+            MouseArea {
+                id: wallBtnArea
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                hoverEnabled: true
+                onClicked: settingRoot.openWallpaperRequested()
             }
         }
     }

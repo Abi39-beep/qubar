@@ -217,8 +217,6 @@ Item {
                     height: 36
                     radius: 18
                     color: scanArea.containsMouse ? Colors.bg2 : Colors.bg1
-                    border.color: Colors.bg3
-                    border.width: 1
 
                     Behavior on color {
                         ColorAnimation {

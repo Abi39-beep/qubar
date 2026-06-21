@@ -17,8 +17,8 @@ Item {
         // THE FIX: Smart back-navigation for all menus!
         if (currentView === 1 || currentView === 2 || currentView === 3) {
             currentView = 0; // Go to Main Grid
-        } else if (currentView === 4) {
-            currentView = 3; // From Themes, go back to Settings!
+        } else if (currentView === 4 || currentView === 5) { // ADDED VIEW 5 HERE
+            currentView = 3; // From Themes or Wallpapers, go back to Settings!
         } else {
             closeRequested(); // Close entirely
         }
@@ -97,8 +97,6 @@ Item {
                 height: 36
                 radius: 18
                 color: settingsArea.containsMouse ? Colors.bg2 : Colors.bg1
-                border.color: Colors.bg3
-                border.width: 1
 
                 Behavior on color {
                     ColorAnimation {
@@ -184,6 +182,7 @@ Item {
         visible: ccRoot.currentView === 3
         onBackRequested: ccRoot.currentView = 0
         onOpenThemeRequested: ccRoot.currentView = 4
+        onOpenWallpaperRequested: ccRoot.currentView = 5 // LINKED THE WALLPAPER SIGNAL
     }
 
     // ==========================================
@@ -193,6 +192,16 @@ Item {
         anchors.fill: parent
         anchors.margins: Config.ccPadding
         visible: ccRoot.currentView === 4
+        onBackRequested: ccRoot.currentView = 3
+    }
+
+    // ==========================================
+    // VIEW 5: WALLPAPER MENU
+    // ==========================================
+    WallpaperMenu {
+        anchors.fill: parent
+        anchors.margins: Config.ccPadding
+        visible: ccRoot.currentView === 5
         onBackRequested: ccRoot.currentView = 3
     }
 }

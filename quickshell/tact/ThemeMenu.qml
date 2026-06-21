@@ -263,12 +263,6 @@ Item {
             }
         }
 
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: Colors.bg3
-        }
-
         // --- DYNAMIC THEME GRID ---
         Flickable {
             width: parent.width
@@ -287,7 +281,7 @@ Item {
 
                     Rectangle {
                         width: (parent.width - 24) / 3
-                        height: 76
+                        height: 72
                         radius: 12
                         clip: true
 
