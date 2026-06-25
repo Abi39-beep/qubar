@@ -2,27 +2,31 @@ pragma Singleton
 import QtQuick
 
 QtObject {
-    readonly property color bg0: "#192330"
-    readonly property color bg1: "#232c3b"
-    readonly property color bg2: "#2d3f56"
-    readonly property color bg3: "#39506d"
-    readonly property color bg4: "#486382"
+    // Horizon Background colors (Warm, deep purplish-greys)
+    readonly property color bg0: "#1C1E26" // Main background
+    readonly property color bg1: "#232530" // Lighter background (panels/sidebars)
+    readonly property color bg2: "#2E303E" // Cursorline / Hover state
+    readonly property color bg3: "#44465B" // Selection background
+    readonly property color bg4: "#1A1C23" // Darker terminal/shadow background
 
-    readonly property color red: "#c94f6d"
-    readonly property color orange: "#f4a261"
-    readonly property color yellow: "#dbc074"
-    readonly property color green: "#81b29a"
-    readonly property color aqua: "#73daca"
-    readonly property color blue: "#719cd6"
-    readonly property color purple: "#9d79d6"
+    // Foreground colors (Soft whites and creams)
+    readonly property color fg: "#D5D8DA"  // Main text
+    readonly property color fg0: "#D5D8DA"
+    readonly property color fg1: "#FDF0ED" // Bright white/cream text
+    readonly property color fg2: "#CBCED0" // Muted text
+    readonly property color fg3: "#A5A6A9" // Deeper muted text
 
-    readonly property color fg: "#cdcecf"
-    readonly property color fg0: "#e4e4e5"
-    readonly property color fg1: "#cdcecf"
-    readonly property color fg2: "#aeafb0"
-    readonly property color fg3: "#86888a"
+    // Accent colors (Vibrant neon pastels)
+    readonly property color red: "#E95678"    // Coral Red
+    readonly property color orange: "#F09383" // Peach Orange
+    readonly property color yellow: "#FAC29A" // Soft Gold/Yellow
+    readonly property color green: "#29D398"  // Neon Mint Green
+    readonly property color aqua: "#59E1E3"   // Glowing Cyan
+    readonly property color blue: "#26BBD9"   // Bright Azure Blue
+    readonly property color purple: "#EE64AC" // Magenta/Pink
 
-    readonly property color grey0: "#526374"
-    readonly property color grey1: "#607387"
-    readonly property color grey2: "#73879a"
+    // Greyscale / Muted colors
+    readonly property color grey0: "#6C6F93"  // Muted comments/invisible text
+    readonly property color grey1: "#44465B"  // Lighter grey borders
+    readonly property color grey2: "#2E303E"  // Darker UI element borders
 }

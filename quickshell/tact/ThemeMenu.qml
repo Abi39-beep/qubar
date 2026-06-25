@@ -86,7 +86,10 @@ Item {
         "element.hover": "${Colors.bg2}",
         "element.active": "${Colors.bg3}",
         "element.selected": "${Colors.bg2}",
+
         "title_bar.background": "${Colors.bg0}",
+        "title_bar.inactive_background": "${Colors.bg0}",
+
         "status_bar.background": "${Colors.bg0}",
         "tab_bar.background": "${Colors.bg1}",
         "tab.inactive_background": "${Colors.bg1}",
@@ -140,7 +143,9 @@ Item {
           "comment": { "color": "${Colors.grey1}", "font_style": "italic" },
           "variable": { "color": "${Colors.fg}" },
           "constant": { "color": "${Colors.orange}" },
-          "punctuation": { "color": "${Colors.grey0}" },
+
+          "punctuation": { "color": "${Colors.fg2}" },
+
           "operator": { "color": "${Colors.aqua}" },
           "tag": { "color": "${Colors.red}" }
         }

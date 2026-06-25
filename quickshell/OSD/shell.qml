@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import Quickshell.Hyprland
 import "./Left/"
 import "./Right/"
@@ -34,9 +33,9 @@ ShellRoot {
         id: clock
     }
 
-    Clook {
-        id: clook
-    }
+    //  Clook {
+    //      id: clook
+    //  }
 
     GlobalShortcut {
         name: "powermenu"

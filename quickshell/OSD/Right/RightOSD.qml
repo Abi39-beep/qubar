@@ -43,7 +43,7 @@ PanelWindow {
             bottom: parent.bottom
         }
         anchors.margins: 20
-        color: Qt.alpha(Colors.bg0, 0.75)
+        color: Qt.alpha(Colors.bg0, 1.00)
         border.color: Colors.bg2
         border.width: 2
         radius: 15

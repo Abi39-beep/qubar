@@ -6,18 +6,28 @@ Item {
 
     property int currentView: 0
 
+    // ==========================================
+    // THE FOCUS VOID FIX
+    // Anytime you switch menus or go back, force the main window to listen to the keyboard!
+    // ==========================================
+    onCurrentViewChanged: {
+        ccRoot.forceActiveFocus();
+    }
+
     onVisibleChanged: {
         if (!visible) {
             currentView = 0; // Wipes memory to show Grid when reopened!
+        } else {
+            ccRoot.forceActiveFocus(); // Listen to keyboard when first opened
         }
     }
 
     focus: true
     Keys.onEscapePressed: {
-        // THE FIX: Smart back-navigation for all menus!
+        // Smart back-navigation for all menus
         if (currentView === 1 || currentView === 2 || currentView === 3) {
             currentView = 0; // Go to Main Grid
-        } else if (currentView === 4 || currentView === 5) { // ADDED VIEW 5 HERE
+        } else if (currentView === 4 || currentView === 5) {
             currentView = 3; // From Themes or Wallpapers, go back to Settings!
         } else {
             closeRequested(); // Close entirely
@@ -89,7 +99,7 @@ Item {
                 }
             }
 
-            // --- THE NEW SETTINGS BUTTON ---
+            // --- SETTINGS BUTTON ---
             Rectangle {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
@@ -106,7 +116,7 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: "󰒓" // Gear Icon
+                    text: "󰒓"
                     font.family: Config.fontName
                     font.pixelSize: 18
                     color: Colors.fg0
@@ -182,7 +192,7 @@ Item {
         visible: ccRoot.currentView === 3
         onBackRequested: ccRoot.currentView = 0
         onOpenThemeRequested: ccRoot.currentView = 4
-        onOpenWallpaperRequested: ccRoot.currentView = 5 // LINKED THE WALLPAPER SIGNAL
+        onOpenWallpaperRequested: ccRoot.currentView = 5
     }
 
     // ==========================================

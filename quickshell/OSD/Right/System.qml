@@ -5,35 +5,31 @@ import ".."
 
 Row {
     id: sysRoot
-    
+
     // FIX 1: Gave it a defined height so it doesn't collapse to 0 and turn invisible
-    height: 50 
+    height: 50
     spacing: 10
 
     property string cpuUsage: "0.0%"
-    property string memUsage: "0 MB"
+    property string memUsage: "0000 MB"
 
     Timer {
         interval: 2000
         running: sysRoot.visible
         repeat: true
         onTriggered: {
-            cpuPoll.running = true
-            memPoll.running = true
+            cpuPoll.running = true;
+            memPoll.running = true;
         }
     }
 
     Process {
         id: cpuPoll
-        command:[
-            "bash", 
-            "-c", 
-            "top -bn1 | grep 'Cpu(s)' | awk '{print $2 + $4}'"
-        ]
+        command: ["bash", "-c", "top -bn1 | grep 'Cpu(s)' | awk '{print $2 + $4}'"]
         stdout: SplitParser {
             onRead: data => {
                 if (data.trim() !== "") {
-                    sysRoot.cpuUsage = parseFloat(data).toFixed(1) + "%"
+                    sysRoot.cpuUsage = parseFloat(data).toFixed(1) + "%";
                 }
             }
         }
@@ -41,15 +37,11 @@ Row {
 
     Process {
         id: memPoll
-        command:[
-            "bash", 
-            "-c", 
-            "free -m | awk '/Mem:/ { if($3 < 1024) printf \"%d MB\", $3; else printf \"%.1f GB\", $3/1024 }'"
-        ]
+        command: ["bash", "-c", "free -m | awk '/Mem:/ { if($3 < 1024) printf \"%d MB\", $3; else printf \"%.1f GB\", $3/1024 }'"]
         stdout: SplitParser {
             onRead: data => {
                 if (data.trim() !== "") {
-                    sysRoot.memUsage = data.trim()
+                    sysRoot.memUsage = data.trim();
                 }
             }
         }
@@ -63,7 +55,7 @@ Row {
         color: Colors.bg1
         border.width: 1
         border.color: Colors.bg2
-        
+
         Row {
             anchors.centerIn: parent
             spacing: 8
@@ -77,22 +69,22 @@ Row {
             Column {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 2
-                Text { 
+                Text {
                     text: "CPU"
                     color: Colors.grey1
                     font.pixelSize: 10
-                    font.bold: true 
+                    font.bold: true
                 }
-                Text { 
+                Text {
                     text: sysRoot.cpuUsage
                     color: Colors.fg
                     font.pixelSize: 12
-                    font.bold: true 
+                    font.bold: true
                 }
             }
         }
     }
-    
+
     Rectangle {
         // FIX 2: Dynamically calculate half of the parent width minus the 10px spacing
         width: (sysRoot.width - 10) / 2
@@ -101,7 +93,7 @@ Row {
         color: Colors.bg1
         border.width: 1
         border.color: Colors.bg2
-        
+
         Row {
             anchors.centerIn: parent
             spacing: 8
@@ -115,17 +107,17 @@ Row {
             Column {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 2
-                Text { 
+                Text {
                     text: "Memory"
                     color: Colors.grey1
                     font.pixelSize: 10
-                    font.bold: true 
+                    font.bold: true
                 }
-                Text { 
+                Text {
                     text: sysRoot.memUsage
                     color: Colors.fg
                     font.pixelSize: 12
-                    font.bold: true 
+                    font.bold: true
                 }
             }
         }

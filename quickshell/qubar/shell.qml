@@ -7,8 +7,9 @@ import "./meth/"
 ShellRoot {
     PanelWindow {
         anchors.top: true
-        width: 700
-        height: 28
+        anchors.right: true
+        anchors.left: true
+        height: 38
         color: "transparent"
         WlrLayershell.namespace: "simp"
         WlrLayershell.layer: WlrLayer.Top
@@ -19,18 +20,12 @@ ShellRoot {
 
             Row {
                 anchors.left: parent.left
-                anchors.leftMargin: 15
-                anchors.verticalCenter: parent.verticalCenter
-                Clock {}
-            }
-
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.leftMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
                 // 1. Wrap everything in a Rectangle to create the outer background pill
                 Rectangle {
                     color: Colors.bg0
-                    height: 18
+                    height: 20
                     radius: height / 2 // Keeps the outer container perfectly pill-shaped
 
                     // This creates the padding! It adds 6px to all sides of the inner Row.
@@ -58,8 +53,8 @@ ShellRoot {
                                 readonly property bool isOccupied: ws ? ws.toplevels.values.length > 0 : false
 
                                 // Width expands to 50 if active, otherwise stays 25 (creates a circle/dot)
-                                width: isFocused ? 38 : 18
-                                height: 10
+                                width: isFocused ? 38 : 16
+                                height: 16
                                 radius: height / 2 // Automatically perfectly rounds the corners
 
                                 // Add a smooth animation when the width expands/shrinks
@@ -71,7 +66,7 @@ ShellRoot {
                                 }
 
                                 // Dynamic Styling for the empty pills
-                                color: isFocused ? Colors.aqua : (isOccupied ? Colors.bg3 : Colors.bg1)
+                                color: isFocused ? Colors.green : (isOccupied ? Colors.fg : Colors.bg1)
                                 border.width: isFocused ? 0 : 1
                                 border.color: isOccupied ? Colors.grey0 : Colors.bg2
 
@@ -84,6 +79,12 @@ ShellRoot {
                         }
                     }
                 }
+            }
+
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.verticalCenter: parent.verticalCenter
+                Clock {}
             }
 
             Row {

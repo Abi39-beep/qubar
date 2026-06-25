@@ -7,60 +7,60 @@ Item {
     id: leftRoot
 
     function toggleLeft() {
-        leftOSDWindow.visible = !leftOSDWindow.visible
+        leftOSDWindow.visible = !leftOSDWindow.visible;
     }
 
     PanelWindow {
         id: leftOSDWindow
-        visible: false 
-        
-        exclusionMode: ExclusionMode.Ignore 
+        visible: false
+
+        exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
         WlrLayershell.namespace: "leftosd"
-        
-        anchors { 
+
+        anchors {
             top: true
             bottom: true
             left: true
             right: true
         }
-        
+
         color: "transparent"
 
         MouseArea {
             anchors.fill: parent
             onClicked: {
-                leftOSDWindow.visible = false
+                leftOSDWindow.visible = false;
             }
         }
 
         Rectangle {
             id: leftBg
             width: 420
-            anchors { 
+            anchors {
                 left: parent.left
                 top: parent.top
-                bottom: parent.bottom 
+                bottom: parent.bottom
             }
             anchors.margins: 20
-            
-            color: Qt.alpha(Colors.bg0, 0.75)
+
+            color: Qt.alpha(Colors.bg0, 1.00)
             border.color: Colors.bg2
             border.width: 2
             radius: 15
-            
-            MouseArea { 
-                anchors.fill: parent 
+
+            MouseArea {
+                anchors.fill: parent
             }
 
             focus: true
             Keys.onEscapePressed: {
-                leftOSDWindow.visible = false
+                leftOSDWindow.visible = false;
             }
-            onVisibleChanged: { 
+            onVisibleChanged: {
                 if (visible) {
-                    leftBg.forceActiveFocus()
+                    leftBg.forceActiveFocus();
                 }
             }
 
@@ -71,26 +71,26 @@ Item {
 
                 Clock {}
 
-                Rectangle { 
+                Rectangle {
                     width: parent.width
                     height: 1
-                    color: Colors.bg2 
+                    color: Colors.bg2
                 }
 
                 Calendar {}
 
-                Rectangle { 
+                Rectangle {
                     width: parent.width
                     height: 1
-                    color: Colors.bg2 
+                    color: Colors.bg2
                 }
 
                 Media {}
 
-                Rectangle { 
+                Rectangle {
                     width: parent.width
                     height: 1
-                    color: Colors.bg2 
+                    color: Colors.bg2
                 }
 
                 Volume {}

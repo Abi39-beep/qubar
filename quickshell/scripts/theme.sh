@@ -33,6 +33,7 @@ cp "$THEME_DIR/$selected_theme/quickshell/Colors.qml" "$HOME/.config/quickshell/
 cp "$THEME_DIR/$selected_theme/quickshell/Colors.qml" "$HOME/.config/quickshell/qubar/Colors.qml" 2>/dev/null
 cp "$THEME_DIR/$selected_theme/quickshell/Colors.qml" "$HOME/.config/quickshell/OSD/Colors.qml" 2>/dev/null
 cp "$THEME_DIR/$selected_theme/quickshell/Colors.qml" "$HOME/.config/quickshell/tact/Colors.qml" 2>/dev/null
+cp "$THEME_DIR/$selected_theme/quickshell/Colors.qml" "$HOME/.config/quickshell/new/Colors.qml" 2>/dev/null
 
 # 4. Nuke the QML Cache
 find "$HOME/.config/quickshell" -type d -name ".qmlc" -exec rm -rf {} + 2>/dev/null
@@ -54,7 +55,7 @@ if [ -f "$spicetify_tracker" ]; then
             else
                 spicetify config color_scheme ""
             fi
-            
+
             spicetify apply -n >/dev/null 2>&1
             if pgrep -x spotify >/dev/null; then
                 pkill -x spotify
@@ -90,7 +91,7 @@ if pgrep -x kitty > /dev/null; then
     # Strategy A: Update the file timestamp so Kitty's internal engine detects the change!
     touch "$HOME/.config/kitty/kitty.conf" 2>/dev/null || true
     killall -SIGUSR1 kitty 2>/dev/null || true
-    
+
     # Strategy B: Directly inject the colors via sockets (catches any stubborn windows)
     for socket in /tmp/kitty-*; do
         if [ -e "$socket" ]; then
@@ -101,10 +102,10 @@ fi
 
 # --- FOOT TERMINAL ---
 if pgrep -x foot > /dev/null || pgrep -x footd > /dev/null; then
-    # THE FIX: 'sed -i' physically creates a new file inode. 
+    # THE FIX: 'sed -i' physically creates a new file inode.
     # This acts as a hard change and 100% forces Foot's file-watcher to auto-reload!
     sed -i -e '$a\' "$HOME/.config/foot/foot.ini" 2>/dev/null || true
-    
+
     # Send the manual signals just as a backup
     pkill -USR1 -x foot 2>/dev/null || true
     pkill -USR1 -x footd 2>/dev/null || true

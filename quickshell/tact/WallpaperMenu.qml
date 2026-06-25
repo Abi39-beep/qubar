@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import QtQml.Models
+import Qt5Compat.GraphicalEffects
 
 Item {
     id: wallRoot
@@ -9,10 +10,36 @@ Item {
 
     property string activeWallpaper: ""
 
-    // Regrab focus when opened
+    Timer {
+        id: grabFocusTimer
+        interval: 100
+        running: false
+        onTriggered: {
+            grid.forceActiveFocus();
+        }
+    }
+
+    // ==========================================
+    // THE FIX: The Smart Reset Function
+    // Forces the selection to snap back to the currently applied wallpaper
+    // ==========================================
+    function resetSelection() {
+        if (wallRoot.activeWallpaper === "")
+            return;
+
+        for (let i = 0; i < wallModel.count; i++) {
+            if (wallModel.get(i).filePath === wallRoot.activeWallpaper) {
+                grid.currentIndex = i; // Move keyboard focus
+                grid.positionViewAtIndex(i, GridView.Contain); // Scroll to it if it's hidden!
+                break;
+            }
+        }
+    }
+
     onVisibleChanged: {
         if (visible) {
-            grid.forceActiveFocus();
+            grabFocusTimer.restart();
+            resetSelection(); // Trigger the reset every time you open the menu!
         }
     }
 
@@ -20,9 +47,6 @@ Item {
         id: wallModel
     }
 
-    // ==========================================
-    // 1. FETCH ACTIVE THEME'S WALLPAPERS
-    // ==========================================
     Process {
         id: fetchProc
         command: ["bash", "-c", "theme=$(cat ~/.cache/current_theme); find ~/.config/color-scheme/$theme -maxdepth 1 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \\) | sort"]
@@ -38,16 +62,13 @@ Item {
             }
         }
         onExited: {
-            grid.forceActiveFocus();
             if (grid.currentIndex === -1)
                 grid.currentIndex = 0;
             getActiveWall.running = true;
+            grabFocusTimer.restart();
         }
     }
 
-    // ==========================================
-    // 2. DETECT CURRENTLY APPLIED WALLPAPER
-    // ==========================================
     Process {
         id: getActiveWall
         command: ["bash", "-c", "readlink -f ~/.cache/current_wallpaper"]
@@ -55,27 +76,18 @@ Item {
             onRead: data => {
                 let path = data.trim();
                 wallRoot.activeWallpaper = path;
-
-                // Smart Highlight: Automatically move the keyboard to the active wallpaper!
-                for (let i = 0; i < wallModel.count; i++) {
-                    if (wallModel.get(i).filePath === path) {
-                        grid.currentIndex = i;
-                        break;
-                    }
-                }
+                resetSelection(); // Initial snap when first loaded
             }
         }
     }
 
     function applyWallpaper(path) {
         wallRoot.activeWallpaper = path;
+        resetSelection(); // Lock it in when applied
         let scriptPath = Quickshell.env("HOME") + "/.config/quickshell/scripts/set_wallpaper.sh";
         Quickshell.execDetached(["bash", scriptPath, path]);
     }
 
-    // ==========================================
-    // 3. UI LAYOUT
-    // ==========================================
     Column {
         anchors.fill: parent
         spacing: 16
@@ -132,80 +144,130 @@ Item {
         }
 
         // --- WALLPAPER KEYBOARD GRID ---
-        // (Separator line was removed, so this flows right underneath the header)
         GridView {
             id: grid
             width: parent.width
-            height: parent.height - 52 // Perfectly spans the remaining window space
+            height: parent.height - 52
             cellWidth: parent.width / 2
             cellHeight: 120
             model: wallModel
             clip: true
 
             focus: true
-            keyNavigationEnabled: true
-            keyNavigationWraps: true
 
+            Keys.onLeftPressed: {
+                if (currentIndex > 0)
+                    currentIndex--;
+                event.accepted = true;
+            }
+            Keys.onRightPressed: {
+                if (currentIndex < wallModel.count - 1)
+                    currentIndex++;
+                event.accepted = true;
+            }
+            Keys.onUpPressed: {
+                if (currentIndex >= 2)
+                    currentIndex -= 2;
+                event.accepted = true;
+            }
+            Keys.onDownPressed: {
+                if (currentIndex + 2 < wallModel.count)
+                    currentIndex += 2;
+                else if (currentIndex + 1 < wallModel.count)
+                    currentIndex++;
+                event.accepted = true;
+            }
             Keys.onReturnPressed: {
-                if (currentIndex >= 0 && currentIndex < wallModel.count) {
+                if (currentIndex >= 0 && currentIndex < wallModel.count)
                     applyWallpaper(wallModel.get(currentIndex).filePath);
-                }
+                event.accepted = true;
+            }
+            Keys.onEnterPressed: {
+                if (currentIndex >= 0 && currentIndex < wallModel.count)
+                    applyWallpaper(wallModel.get(currentIndex).filePath);
+                event.accepted = true;
+            }
+            Keys.onEscapePressed: {
+                wallRoot.backRequested();
+                event.accepted = true;
             }
 
             delegate: Item {
                 width: grid.cellWidth
                 height: grid.cellHeight
 
-                // THE OUTER CONTAINER: Handles the Border perfectly
-                Rectangle {
+                z: grid.currentIndex === index ? 10 : 1
+
+                Item {
                     anchors.fill: parent
-                    anchors.margins: 8
-                    radius: 12
-                    color: "transparent"
+                    anchors.margins: 12
 
                     property bool isActive: wallRoot.activeWallpaper === filePath
                     property bool isFocused: grid.currentIndex === index
 
-                    border.color: isActive ? Colors.aqua : (isFocused ? Colors.bg4 : "transparent")
-                    border.width: isActive ? 3 : (isFocused ? 2 : 0)
-
-                    Behavior on border.color {
-                        ColorAnimation {
-                            duration: 150
+                    // The Pop Animation
+                    scale: isFocused ? 1.08 : 1.0
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: 250
+                            easing.type: Easing.OutBack
                         }
                     }
 
-                    // THE INNER CONTAINER: The actual image
+                    // LAYER 1: RAW IMAGE
+                    Image {
+                        id: rawImg
+                        anchors.fill: parent
+                        source: "file://" + filePath
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        cache: true
+                        sourceSize.width: 300
+                        sourceSize.height: 200
+                        visible: false
+                    }
+
+                    // LAYER 2: ROUNDED STENCIL
+                    Rectangle {
+                        id: maskRect
+                        anchors.fill: parent
+                        radius: 12
+                        visible: false
+                    }
+
+                    // LAYER 3: PERFECTLY CUT IMAGE
+                    OpacityMask {
+                        anchors.fill: parent
+                        source: rawImg
+                        maskSource: maskRect
+                    }
+
                     Rectangle {
                         anchors.fill: parent
-                        anchors.margins: 4
-                        radius: 8
-                        clip: true
-                        color: Colors.bg1
-
-                        Image {
-                            anchors.fill: parent
-                            source: "file://" + filePath
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                            cache: true
-                            sourceSize.width: 300
-                            sourceSize.height: 200
-                        }
-
-                        // Subtle darken when hovered
-                        Rectangle {
-                            anchors.fill: parent
-                            color: mouseArea.containsMouse ? Qt.rgba(0, 0, 0, 0.3) : "transparent"
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 150
-                                }
+                        radius: 12
+                        color: mouseArea.containsMouse ? Qt.rgba(0, 0, 0, 0.3) : "transparent"
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: 150
                             }
                         }
                     }
 
-                    // (The Checkmark Badge was completely removed here)
+                    // LAYER 4: BORDER
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 12
+                        color: "transparent"
+
+                        border.color: parent.isActive ? Colors.aqua : (parent.isFocused ? Colors.fg0 : "transparent")
+                        border.width: parent.isActive ? 2 : (parent.isFocused ? 1 : 0)
+
+                        Behavior on border.color {
+                            ColorAnimation {
+                                duration: 150
+                            }
+                        }
+                    }
 
                     MouseArea {
                         id: mouseArea
@@ -214,7 +276,7 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             grid.currentIndex = index;
-                            grid.forceActiveFocus();
+                            grabFocusTimer.restart();
                             applyWallpaper(filePath);
                         }
                     }

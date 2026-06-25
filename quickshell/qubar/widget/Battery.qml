@@ -66,7 +66,7 @@ Rectangle {
         anchor.edges: Edges.Bottom | Edges.Left
 
         width: 200
-        height: 120
+        height: 130
         visible: false
 
         color: "transparent"

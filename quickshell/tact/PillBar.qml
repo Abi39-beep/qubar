@@ -326,14 +326,14 @@ PanelWindow {
         border.width: 2
 
         // --- MASTER KEYBOARD CONTROLLER ---
-        // Your escape key logic remains completely untouched and safe:
         Keys.onEscapePressed: {
             if (pillWindow.isNotifying) {
                 if (pillWindow.currentNotification)
                     pillWindow.currentNotification.dismiss();
                 pillWindow.isNotifying = false;
             } else if (pillWindow.viewState === 7) {
-                if (controlCenter.currentView === 4) {
+                // THE FIX: Added 'currentView === 5' so Wallpapers goes back to Settings!
+                if (controlCenter.currentView === 4 || controlCenter.currentView === 5) {
                     controlCenter.currentView = 3;
                 } else if (controlCenter.currentView !== 0) {
                     controlCenter.currentView = 0;

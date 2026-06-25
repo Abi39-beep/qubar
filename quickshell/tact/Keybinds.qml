@@ -30,7 +30,6 @@ Item {
 
         function toggleControlCenter(): void {
             if (bindsRoot.target) {
-                // Uses the new 'cc' alias to ensure it defaults to the main grid!
                 if (bindsRoot.target.viewState === 7 && bindsRoot.target.cc.currentView === 0) {
                     bindsRoot.target.viewState = 0;
                 } else {
@@ -58,6 +57,17 @@ Item {
                 } else {
                     bindsRoot.target.viewState = 7;
                     bindsRoot.target.cc.currentView = 4;
+                }
+            }
+        }
+
+        function toggleWallpaper(): void {
+            if (bindsRoot.target) {
+                if (bindsRoot.target.viewState === 7 && bindsRoot.target.cc.currentView === 5) {
+                    bindsRoot.target.viewState = 0; // Close it if it's already open
+                } else {
+                    bindsRoot.target.viewState = 7; // Open Control Center
+                    bindsRoot.target.cc.currentView = 5; // Jump to Wallpapers
                 }
             }
         }

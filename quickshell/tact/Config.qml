@@ -3,7 +3,7 @@ import QtQuick
 
 QtObject {
     // --- Typography ---
-    readonly property string fontName: "JetBrainsMono Nerd Font"
+    readonly property string fontName: "SF Mono Propo"
     readonly property int fontSizeTime: 16
     readonly property int fontSizeDate: 14
     readonly property int fontSizeWorkspace: 12
