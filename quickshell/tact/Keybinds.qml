@@ -6,7 +6,7 @@ Item {
     property var target: null
 
     IpcHandler {
-        target: "mediaPill"
+        target: "bar"
 
         function toggleTime(): void {
             if (bindsRoot.target)
@@ -64,10 +64,10 @@ Item {
         function toggleWallpaper(): void {
             if (bindsRoot.target) {
                 if (bindsRoot.target.viewState === 7 && bindsRoot.target.cc.currentView === 5) {
-                    bindsRoot.target.viewState = 0; // Close it if it's already open
+                    bindsRoot.target.viewState = 0;
                 } else {
-                    bindsRoot.target.viewState = 7; // Open Control Center
-                    bindsRoot.target.cc.currentView = 5; // Jump to Wallpapers
+                    bindsRoot.target.viewState = 7;
+                    bindsRoot.target.cc.currentView = 5;
                 }
             }
         }

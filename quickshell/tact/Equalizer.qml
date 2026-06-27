@@ -1,23 +1,13 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 
 Item {
     id: visualizer
 
-    // Explicit bounds ensure the PillBar layout doesn't crush the EQ to 0 width
     width: (Config.eqBarCount * Config.eqBarWidth) + ((Config.eqBarCount - 1) * Config.eqBarSpacing)
     height: Config.eqMaxHeight
 
     property bool isPlaying: false
-
-    onIsPlayingChanged: {
-        if (!isPlaying) {
-            for (let i = 0; i < eqRepeater.count; i++) {
-                if (eqRepeater.itemAt(i)) {
-                    eqRepeater.itemAt(i).height = Config.eqMinHeight;
-                }
-            }
-        }
-    }
 
     Row {
         anchors.fill: parent
@@ -28,32 +18,40 @@ Item {
             model: Config.eqBarCount
 
             Rectangle {
+                id: bar
                 width: Config.eqBarWidth
                 height: Config.eqMinHeight
                 radius: width / 2
                 color: Colors.aqua
 
-                // Anchoring to the bottom forces the bars to grow UPWARDS
                 anchors.bottom: parent.bottom
 
                 Behavior on height {
                     NumberAnimation {
-                        duration: Config.eqAnimDuration
+                        duration: animTimer.interval
                         easing.type: Easing.InOutQuad
                     }
                 }
 
                 Timer {
+                    id: animTimer
                     running: visualizer.isPlaying
                     repeat: true
-                    // Stagger the bounce timing slightly
-                    interval: Config.eqAnimDuration + (Math.random() * 50)
+
+                    interval: Config.eqAnimDuration
+
+                    onRunningChanged: {
+                        if (running) {
+                            triggered();
+                        } else {
+                            bar.height = Config.eqMinHeight;
+                        }
+                    }
 
                     onTriggered: {
                         if (visualizer.isPlaying) {
-                            parent.height = Math.max(Config.eqMinHeight, Math.random() * Config.eqMaxHeight);
-                        } else {
-                            parent.height = Config.eqMinHeight;
+                            animTimer.interval = Config.eqAnimDuration + (Math.random() * 50);
+                            bar.height = Math.max(Config.eqMinHeight, Math.random() * Config.eqMaxHeight);
                         }
                     }
                 }

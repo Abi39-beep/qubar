@@ -1,156 +1,79 @@
 import QtQuick
-import Quickshell
-import Quickshell.Io
+import Quickshell.Networking
 
 Item {
     id: wifiMenuRoot
     signal backRequested
 
     property string expandedSsid: ""
-    property bool isRadioOn: false
-    property bool isScanning: false
+
+    // ==========================================
+    // 1. NATIVE STATE ENGINE
+    // ==========================================
+    property var wifiDevice: Networking.devices.values.find(d => d.type === DeviceType.Wifi)
+    property bool isRadioOn: Networking.wifiEnabled
+
+    property var activeNetworkList: []
 
     onVisibleChanged: {
-        if (!visible) {
-            expandedSsid = "";
-        } else {
-            fetchDevicesProc.running = false;
-            fetchDevicesProc.running = true;
-        }
-    }
-
-    onIsRadioOnChanged: {
-        if (!isRadioOn)
-            networkModel.clear();
-    }
-
-    Process {
-        id: radioProc
-        command: ["bash", "-c", "nmcli radio wifi"]
-        running: true
-        stdout: SplitParser {
-            onRead: data => {
-                wifiMenuRoot.isRadioOn = (data.trim() === "enabled");
+        if (visible) {
+            if (wifiDevice && isRadioOn && wifiDevice.requestScan) {
+                wifiDevice.requestScan();
             }
-        }
-    }
-    Timer {
-        interval: 3000
-        running: true
-        repeat: true
-        onTriggered: radioProc.running = true
-    }
-
-    // --- SCANNER LOGIC ---
-    Process {
-        id: scanActionProc
-        running: false
-    }
-    Timer {
-        id: scanTimer
-        interval: 10000
-        onTriggered: wifiMenuRoot.isScanning = false
-    }
-
-    function toggleScan(start) {
-        wifiMenuRoot.isScanning = start;
-        if (start) {
-            scanActionProc.command = ["bash", "-c", "nmcli dev wifi rescan"];
-            scanActionProc.running = true;
-            scanTimer.restart();
+            updateNetworkList();
         } else {
-            scanTimer.stop();
+            expandedSsid = "";
         }
     }
 
-    Process {
-        id: actionProc
-        running: false
-        onExited: {
-            fetchDevicesProc.running = false;
-            fetchDevicesProc.running = true;
-        }
-    }
-
-    // --- REAL-TIME SMART FETCHER ---
+    // ==========================================
+    // 2. THE UI FREEZE & SORT ENGINE
+    // ==========================================
     Timer {
-        interval: 3000
+        interval: 1000
         running: wifiMenuRoot.visible
         repeat: true
-        onTriggered: {
-            fetchDevicesProc.running = false;
-            fetchDevicesProc.running = true;
+        onTriggered: updateNetworkList()
+    }
+
+    function updateNetworkList() {
+        if (wifiMenuRoot.expandedSsid !== "")
+            return;
+
+        if (!wifiDevice || !isRadioOn || !wifiDevice.networks) {
+            activeNetworkList = [];
+            return;
         }
-    }
 
-    Process {
-        id: fetchDevicesProc
-        command: ["bash", "-c", "val=$(nmcli -t -f ACTIVE,SIGNAL,SSID dev wifi list); echo \"${val:-NONE}\""]
-        running: true
+        let nets = wifiDevice.networks.values;
+        let devs = [];
 
-        stdout: SplitParser {
-            onRead: data => {
-                let res = data.trim();
-                if (res === "NONE" || res === "")
-                    return;
+        for (let i = 0; i < nets.length; i++) {
+            if (!nets[i].name)
+                continue;
 
-                let lines = res.split("\n");
-                for (let i = 0; i < lines.length; i++) {
-                    let line = lines[i].trim();
-                    if (!line)
-                        continue;
-
-                    let firstColon = line.indexOf(":");
-                    let secondColon = line.indexOf(":", firstColon + 1);
-
-                    if (firstColon > -1 && secondColon > -1) {
-                        let activeStr = line.substring(0, firstColon);
-                        let isActive = (activeStr === "yes" || activeStr === "*");
-                        let signal = parseInt(line.substring(firstColon + 1, secondColon)) || 0;
-                        let ssid = line.substring(secondColon + 1);
-
-                        if (ssid !== "") {
-                            let found = false;
-                            for (let j = 0; j < networkModel.count; j++) {
-                                if (networkModel.get(j).ssid === ssid) {
-                                    networkModel.setProperty(j, "signal", signal);
-                                    if (networkModel.get(j).isActive !== isActive) {
-                                        networkModel.setProperty(j, "isActive", isActive);
-
-                                        if (isActive)
-                                            networkModel.move(j, 0, 1);
-                                        else
-                                            networkModel.move(j, networkModel.count - 1, 1);
-                                    }
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if (!found) {
-                                if (isActive)
-                                    networkModel.insert(0, {
-                                        "ssid": ssid,
-                                        "signal": signal,
-                                        "isActive": isActive
-                                    });
-                                else
-                                    networkModel.append({
-                                        "ssid": ssid,
-                                        "signal": signal,
-                                        "isActive": isActive
-                                    });
-                            }
-                        }
-                    }
-                }
-            }
+            devs.push({
+                networkObj: nets[i],
+                ssid: nets[i].name,
+                isActive: nets[i].connected,
+                signal: nets[i].signalStrength || 0
+            });
         }
+
+        devs.sort((a, b) => {
+            let aConn = a.isActive ? 1 : 0;
+            let bConn = b.isActive ? 1 : 0;
+            if (aConn !== bConn)
+                return bConn - aConn;
+            return b.signal - a.signal;
+        });
+
+        activeNetworkList = devs;
     }
 
-    ListModel {
-        id: networkModel
-    }
-
+    // ==========================================
+    // 3. UI LAYOUT
+    // ==========================================
     Column {
         anchors.fill: parent
         spacing: 16
@@ -165,7 +88,6 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 12
 
-                // THE FIX: Premium Back Button Background
                 Rectangle {
                     width: 36
                     height: 36
@@ -211,44 +133,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
 
-                // THE FIX: Premium Scan Button Background
-                Rectangle {
-                    width: 36
-                    height: 36
-                    radius: 18
-                    color: scanArea.containsMouse ? Colors.bg2 : Colors.bg1
-
-                    Behavior on color {
-                        ColorAnimation {
-                            duration: 150
-                        }
-                    }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "󰑐"
-                        font.family: Config.fontName
-                        font.pixelSize: 20
-                        color: wifiMenuRoot.isScanning ? Colors.aqua : Colors.fg0
-
-                        RotationAnimation on rotation {
-                            loops: Animation.Infinite
-                            from: 0
-                            to: 360
-                            duration: 1000
-                            running: wifiMenuRoot.isScanning
-                        }
-                    }
-
-                    MouseArea {
-                        id: scanArea
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        hoverEnabled: true
-                        onClicked: toggleScan(!wifiMenuRoot.isScanning)
-                    }
-                }
-
+                // POWER TOGGLE
                 Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 44
@@ -261,7 +146,6 @@ Item {
                         radius: 11
 
                         color: wifiMenuRoot.isRadioOn ? (pwrArea.containsMouse ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.8) : Colors.aqua) : (pwrArea.containsMouse ? Colors.bg2 : Colors.bg1)
-
                         border.color: wifiMenuRoot.isRadioOn ? Colors.aqua : Colors.bg3
                         border.width: 1
 
@@ -277,7 +161,6 @@ Item {
                             radius: 7
                             anchors.verticalCenter: parent.verticalCenter
                             x: wifiMenuRoot.isRadioOn ? parent.width - width - 4 : 4
-
                             color: wifiMenuRoot.isRadioOn ? Colors.bg0 : (pwrArea.containsMouse ? Colors.fg2 : Colors.fg3)
 
                             Behavior on x {
@@ -300,17 +183,16 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         hoverEnabled: true
                         onClicked: {
-                            let cmd = wifiMenuRoot.isRadioOn ? "nmcli radio wifi off" : "nmcli radio wifi on";
-                            actionProc.command = ["bash", "-c", cmd];
-                            actionProc.running = true;
-                            wifiMenuRoot.isRadioOn = !wifiMenuRoot.isRadioOn;
+                            Networking.wifiEnabled = !Networking.wifiEnabled;
+                            if (Networking.wifiEnabled && wifiDevice && wifiDevice.requestScan) {
+                                wifiDevice.requestScan();
+                            }
                         }
                     }
                 }
             }
         }
 
-        // --- SEPARATOR LINE ---
         Rectangle {
             width: parent.width
             height: 1
@@ -331,11 +213,12 @@ Item {
                 spacing: 8
 
                 Repeater {
-                    model: networkModel
+                    model: wifiMenuRoot.activeNetworkList
+
                     Rectangle {
                         id: netBox
                         width: parent.width
-                        property bool isExpanded: wifiMenuRoot.expandedSsid === model.ssid
+                        property bool isExpanded: wifiMenuRoot.expandedSsid === modelData.ssid
 
                         onIsExpandedChanged: {
                             if (!isExpanded) {
@@ -344,13 +227,12 @@ Item {
                             }
                         }
 
-                        height: isExpanded ? (model.isActive ? 104 : 124) : 48
+                        height: isExpanded ? (modelData.isActive ? 104 : 124) : 48
                         radius: 12
                         clip: true
 
-                        // THE FIX: Increased contrast! Connected networks get the Aqua glow, others get distinct bg2/bg3 cards!
-                        color: model.isActive ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.15) : (netMouseArea.containsMouse ? Colors.bg3 : Colors.bg2)
-                        border.color: model.isActive ? Colors.aqua : (netMouseArea.containsMouse ? Colors.fg3 : Colors.bg3)
+                        color: modelData.isActive ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.15) : (netMouseArea.containsMouse ? Colors.bg3 : Colors.bg2)
+                        border.color: modelData.isActive ? Colors.aqua : (netMouseArea.containsMouse ? Colors.fg3 : Colors.bg3)
                         border.width: 1
 
                         Behavior on height {
@@ -381,11 +263,11 @@ Item {
                                 anchors.leftMargin: 16
                                 anchors.right: statusBadge.visible ? statusBadge.left : parent.right
                                 anchors.rightMargin: 16
-                                text: model.ssid
+                                text: modelData.ssid
                                 font.family: Config.fontName
                                 font.pixelSize: 14
-                                font.bold: model.isActive
-                                color: model.isActive ? Colors.aqua : Colors.fg0
+                                font.bold: modelData.isActive
+                                color: modelData.isActive ? Colors.aqua : Colors.fg0
                                 elide: Text.ElideRight
                             }
 
@@ -394,7 +276,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 anchors.right: parent.right
                                 anchors.rightMargin: 16
-                                visible: model.isActive
+                                visible: modelData.isActive
                                 text: "Connected"
                                 color: Colors.aqua
                                 font.family: Config.fontName
@@ -408,12 +290,15 @@ Item {
                                 cursorShape: Qt.PointingHandCursor
                                 hoverEnabled: true
                                 onClicked: {
-                                    if (wifiMenuRoot.expandedSsid === model.ssid) {
+                                    if (wifiMenuRoot.expandedSsid === modelData.ssid) {
+                                        // Unfreeze when closed
                                         wifiMenuRoot.expandedSsid = "";
+                                        wifiMenuRoot.updateNetworkList();
                                     } else {
-                                        wifiMenuRoot.expandedSsid = model.ssid;
-                                        if (!model.isActive)
+                                        wifiMenuRoot.expandedSsid = modelData.ssid;
+                                        if (!modelData.isActive) {
                                             passInput.forceActiveFocus();
+                                        }
                                     }
                                 }
                             }
@@ -438,7 +323,7 @@ Item {
                                 anchors.margins: 12
                                 anchors.topMargin: 0
                                 spacing: 8
-                                visible: !model.isActive
+                                visible: !modelData.isActive
 
                                 property bool showPass: false
 
@@ -466,21 +351,39 @@ Item {
                                         echoMode: passCol.showPass ? TextInput.Normal : TextInput.Password
                                         clip: true
 
+                                        selectByMouse: true
+                                        activeFocusOnPress: true
+
                                         Keys.onEscapePressed: {
                                             wifiMenuRoot.expandedSsid = "";
                                             ccRoot.forceActiveFocus();
+                                            wifiMenuRoot.updateNetworkList();
                                         }
 
                                         onAccepted: {
-                                            actionProc.command = ["bash", "-c", "nmcli dev wifi connect '" + model.ssid + "' password '" + passInput.text + "'"];
-                                            actionProc.running = true;
+                                            if (passInput.text !== "") {
+                                                modelData.networkObj.connect(passInput.text);
+                                            } else {
+                                                modelData.networkObj.connect();
+                                            }
+
                                             wifiMenuRoot.expandedSsid = "";
                                             ccRoot.forceActiveFocus();
+                                            wifiMenuRoot.updateNetworkList();
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: passInput
+                                        cursorShape: Qt.IBeamCursor
+                                        onClicked: {
+                                            passInput.forceActiveFocus();
                                         }
                                     }
 
                                     Text {
                                         id: eyeBtn
+                                        width: 24
                                         anchors.right: parent.right
                                         anchors.rightMargin: 10
                                         anchors.verticalCenter: parent.verticalCenter
@@ -488,6 +391,7 @@ Item {
                                         font.family: Config.fontName
                                         font.pixelSize: 16
                                         color: eyeArea.containsMouse ? Colors.aqua : Colors.fg3
+                                        horizontalAlignment: Text.AlignRight
 
                                         MouseArea {
                                             id: eyeArea
@@ -516,7 +420,7 @@ Item {
                                 anchors.margins: 12
                                 anchors.topMargin: 4
                                 spacing: 12
-                                visible: model.isActive
+                                visible: modelData.isActive
 
                                 Rectangle {
                                     width: (parent.width - 12) / 2
@@ -525,6 +429,7 @@ Item {
                                     color: connArea.containsMouse ? Colors.bg3 : Colors.bg2
                                     border.color: Colors.bg3
                                     border.width: 1
+
                                     Behavior on color {
                                         ColorAnimation {
                                             duration: 150
@@ -546,9 +451,9 @@ Item {
                                         cursorShape: Qt.PointingHandCursor
                                         hoverEnabled: true
                                         onClicked: {
-                                            actionProc.command = ["bash", "-c", "nmcli con down id '" + model.ssid + "'"];
-                                            actionProc.running = true;
+                                            modelData.networkObj.disconnect();
                                             wifiMenuRoot.expandedSsid = "";
+                                            wifiMenuRoot.updateNetworkList();
                                         }
                                     }
                                 }
@@ -558,11 +463,13 @@ Item {
                                     height: 36
                                     radius: 8
                                     color: forgetArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.8) : Colors.red
+
                                     Behavior on color {
                                         ColorAnimation {
                                             duration: 150
                                         }
                                     }
+
                                     Text {
                                         anchors.centerIn: parent
                                         text: "Forget"
@@ -578,16 +485,13 @@ Item {
                                         cursorShape: Qt.PointingHandCursor
                                         hoverEnabled: true
                                         onClicked: {
-                                            actionProc.command = ["bash", "-c", "nmcli con delete id '" + model.ssid + "'"];
-                                            actionProc.running = true;
-                                            wifiMenuRoot.expandedSsid = "";
-
-                                            for (let j = 0; j < networkModel.count; j++) {
-                                                if (networkModel.get(j).ssid === model.ssid) {
-                                                    networkModel.remove(j);
-                                                    break;
-                                                }
+                                            if (modelData.networkObj.forget) {
+                                                modelData.networkObj.forget();
+                                            } else {
+                                                modelData.networkObj.disconnect();
                                             }
+                                            wifiMenuRoot.expandedSsid = "";
+                                            wifiMenuRoot.updateNetworkList();
                                         }
                                     }
                                 }

@@ -6,31 +6,26 @@ Item {
 
     property int currentView: 0
 
-    // ==========================================
-    // THE FOCUS VOID FIX
-    // Anytime you switch menus or go back, force the main window to listen to the keyboard!
-    // ==========================================
     onCurrentViewChanged: {
         ccRoot.forceActiveFocus();
     }
 
     onVisibleChanged: {
         if (!visible) {
-            currentView = 0; // Wipes memory to show Grid when reopened!
+            currentView = 0;
         } else {
-            ccRoot.forceActiveFocus(); // Listen to keyboard when first opened
+            ccRoot.forceActiveFocus();
         }
     }
 
     focus: true
     Keys.onEscapePressed: {
-        // Smart back-navigation for all menus
         if (currentView === 1 || currentView === 2 || currentView === 3) {
-            currentView = 0; // Go to Main Grid
+            currentView = 0;
         } else if (currentView === 4 || currentView === 5) {
-            currentView = 3; // From Themes or Wallpapers, go back to Settings!
+            currentView = 3;
         } else {
-            closeRequested(); // Close entirely
+            closeRequested();
         }
     }
 

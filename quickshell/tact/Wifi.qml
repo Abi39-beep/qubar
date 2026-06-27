@@ -1,14 +1,19 @@
 import QtQuick
-import Quickshell
-import Quickshell.Io
+import Quickshell.Networking
 
 Rectangle {
     id: root
     signal openMenuRequested
 
-    property bool isRadioOn: false
-    property string currentSsid: ""
-    property int currentSignal: 0
+    // ==========================================
+    // 1. TRUE NATIVE DECLARATIVE BINDINGS
+    // ==========================================
+    property var wifiDevice: Networking.devices.values.find(d => d.type === DeviceType.Wifi)
+    property var activeNetwork: wifiDevice ? wifiDevice.networks.values.find(n => n.connected) : null
+
+    property bool isRadioOn: Networking.wifiEnabled
+    property string currentSsid: activeNetwork ? activeNetwork.name : ""
+    property real currentSignal: activeNetwork ? activeNetwork.signalStrength : 0
 
     property bool isHovered: menuArea.containsMouse || circleArea.containsMouse
 
@@ -26,61 +31,21 @@ Rectangle {
         }
     }
 
-    Process {
-        id: radioProc
-        command: ["bash", "-c", "nmcli radio wifi"]
-        running: true
-        stdout: SplitParser {
-            onRead: data => {
-                root.isRadioOn = (data.trim() === "enabled");
-            }
-        }
-    }
-
-    Process {
-        id: ssidProc
-        command: ["bash", "-c", "val=$(nmcli -t -f ACTIVE,SIGNAL,SSID dev wifi list | grep -E '^yes|^\\*' | head -n 1); echo \"${val:-NONE}\""]
-        running: true
-        stdout: SplitParser {
-            onRead: data => {
-                let res = data.trim();
-                if (res === "NONE" || res === "") {
-                    root.currentSsid = "";
-                    root.currentSignal = 0;
-                } else {
-                    let firstColon = res.indexOf(":");
-                    let secondColon = res.indexOf(":", firstColon + 1);
-                    if (firstColon > -1 && secondColon > -1) {
-                        root.currentSignal = parseInt(res.substring(firstColon + 1, secondColon)) || 0;
-                        root.currentSsid = res.substring(secondColon + 1);
-                    }
-                }
-            }
-        }
-    }
-
-    Timer {
-        interval: 3000
-        running: true
-        repeat: true
-        onTriggered: {
-            radioProc.running = true;
-            ssidProc.running = true;
-        }
-    }
-
     function getWifiOpacity(sig) {
         if (root.currentSsid === "")
             return 1.0;
-        if (sig > 75)
+        if (sig >= 0.75)
             return 1.0;
-        if (sig > 50)
+        if (sig >= 0.50)
             return 0.75;
-        if (sig > 25)
+        if (sig >= 0.25)
             return 0.50;
         return 0.35;
     }
 
+    // ==========================================
+    // 2. UI LAYOUT
+    // ==========================================
     Row {
         anchors.fill: parent
         anchors.margins: 6
@@ -91,7 +56,6 @@ Rectangle {
             height: parent.height
             radius: width / 2
 
-            // THE FIX: Cranked up the black overlay from 0.15 to 0.30 so it clearly pops against the aqua!
             color: root.isRadioOn ? (circleArea.containsMouse ? Qt.rgba(0, 0, 0, 0.45) : Qt.rgba(0, 0, 0, 0.30)) : (circleArea.containsMouse ? Colors.bg3 : Colors.bg2)
 
             Behavior on color {
@@ -121,13 +85,8 @@ Rectangle {
                 cursorShape: Qt.PointingHandCursor
                 hoverEnabled: true
                 onClicked: {
-                    let cmd = root.isRadioOn ? "nmcli radio wifi off" : "nmcli radio wifi on";
-                    Qt.createQmlObject('import Quickshell.Io; Process { command: ["bash", "-c", "' + cmd + '"]; running: true }', root, "toggleProc");
-                    root.isRadioOn = !root.isRadioOn;
-                    if (!root.isRadioOn) {
-                        root.currentSsid = "";
-                        root.currentSignal = 0;
-                    }
+                    // Instantly toggles the Quickshell Networking Singleton
+                    Networking.wifiEnabled = !Networking.wifiEnabled;
                 }
             }
         }

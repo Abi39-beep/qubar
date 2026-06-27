@@ -12,6 +12,49 @@ Item {
     // 0 = Apps, 1 = Clipboard
     property bool isClipboardMode: false
 
+    // ==========================================
+    // 1. GLOBAL LAUNCH FUNCTIONS
+    // ==========================================
+    function launchApp(appModel) {
+        if (appModel.runInTerminal) {
+            let cmdArr = appModel.command || [];
+            let baseCmd = cmdArr.length > 0 ? cmdArr[0] : appModel.name.toLowerCase();
+            launcherRoot.pendingCommand = Config.terminalEmulator + " -e " + baseCmd;
+            launcherRoot.closeRequested();
+            execTimer.restart();
+        } else {
+            launcherRoot.pendingApp = appModel;
+            launcherRoot.closeRequested();
+            execTimer.restart();
+        }
+    }
+
+    function copyClip(clipModel) {
+        let safeLine = clipModel.rawLine.replace(/'/g, "'\\''");
+        Quickshell.execDetached(["bash", "-c", "echo -E '" + safeLine + "' | cliphist decode | wl-copy"]);
+        launcherRoot.closeRequested();
+    }
+
+    // ==========================================
+    // 2. APP LAUNCH DELAY ENGINE
+    // ==========================================
+    property var pendingApp: null
+    property string pendingCommand: ""
+
+    Timer {
+        id: execTimer
+        interval: 350
+        onTriggered: {
+            if (launcherRoot.pendingApp) {
+                launcherRoot.pendingApp.execute();
+                launcherRoot.pendingApp = null;
+            } else if (launcherRoot.pendingCommand !== "") {
+                Quickshell.execDetached(["bash", "-c", launcherRoot.pendingCommand]);
+                launcherRoot.pendingCommand = "";
+            }
+        }
+    }
+
     // --- CLIPBOARD DATA ENGINE ---
     property var allClips: []
     property string clipBuffer: ""
@@ -22,11 +65,15 @@ Item {
         running: false
         stdout: SplitParser {
             onRead: data => {
-                clipBuffer += data + "\n";
+                launcherRoot.clipBuffer += data + "\n";
             }
         }
-        onExited: {
-            let lines = clipBuffer.split("\n");
+    }
+
+    Connections {
+        target: clipProc
+        function onExited() {
+            let lines = launcherRoot.clipBuffer.split("\n");
             let tempArr = [];
             for (let i = 0; i < lines.length; i++) {
                 let line = lines[i].trim();
@@ -43,13 +90,13 @@ Item {
                 }
             }
             launcherRoot.allClips = tempArr;
-            clipBuffer = "";
+            launcherRoot.clipBuffer = "";
         }
     }
 
     // --- SMART CONFIG-DRIVEN HEIGHT MATH ---
     property int dynamicHeight: {
-        let activeList = isClipboardMode ? clipList : appList;
+        let activeList = launcherRoot.isClipboardMode ? clipList : appList;
         let visibleItems = Math.min(activeList.count, Config.launcherMaxItems);
 
         let listHeight = visibleItems > 0 ? (visibleItems * (Config.appItemHeight + 6)) - 6 : 0;
@@ -66,14 +113,14 @@ Item {
 
     onVisibleChanged: {
         if (visible) {
-            isClipboardMode = false;
+            launcherRoot.isClipboardMode = false;
             searchInput.text = "";
             appList.contentY = 0;
             appList.currentIndex = 0;
             clipList.contentY = 0;
             clipList.currentIndex = 0;
 
-            clipBuffer = "";
+            launcherRoot.clipBuffer = "";
             clipProc.running = false;
             clipProc.running = true;
 
@@ -95,10 +142,10 @@ Item {
             height: Config.searchBarHeight
             radius: Config.searchBarRadius
             color: Colors.bg2
-            border.color: searchInput.activeFocus ? (isClipboardMode ? Colors.aqua : Colors.green) : Colors.bg3
+            border.color: searchInput.activeFocus ? (launcherRoot.isClipboardMode ? Colors.aqua : Colors.green) : Colors.bg3
             border.width: 2
 
-            property bool showClear: isClipboardMode && launcherRoot.allClips.length > 0
+            property bool showClear: launcherRoot.isClipboardMode && launcherRoot.allClips.length > 0
 
             Behavior on border.color {
                 ColorAnimation {
@@ -113,10 +160,10 @@ Item {
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: isClipboardMode ? "󰅍" : ""
+                    text: launcherRoot.isClipboardMode ? "󰅍" : ""
                     font.family: Config.fontName
                     font.pixelSize: Config.fontSizeSearchIcon
-                    color: searchInput.activeFocus ? (isClipboardMode ? Colors.aqua : Colors.green) : Colors.fg2
+                    color: searchInput.activeFocus ? (launcherRoot.isClipboardMode ? Colors.aqua : Colors.green) : Colors.fg2
                     Behavior on color {
                         ColorAnimation {
                             duration: 150
@@ -127,14 +174,13 @@ Item {
                 TextField {
                     id: searchInput
                     anchors.verticalCenter: parent.verticalCenter
-                    // Dynamically adjusts text field width if the clear icon is visible
                     width: parent.width - (Config.fontSizeSearchIcon + 24) - (searchBar.showClear ? 40 : 0)
                     color: Colors.fg0
                     font.family: Config.fontName
                     font.pixelSize: Config.fontSizeSearchInput
                     background: null
 
-                    placeholderText: isClipboardMode ? "Search clipboard... (Tab to switch)" : "Search apps... (Tab to switch)"
+                    placeholderText: launcherRoot.isClipboardMode ? "Search clipboard... (Tab to switch)" : "Search apps... (Tab to switch)"
                     placeholderTextColor: Colors.bg4
 
                     onTextChanged: {
@@ -143,7 +189,7 @@ Item {
                     }
 
                     Keys.onPressed: event => {
-                        let activeList = isClipboardMode ? clipList : appList;
+                        let activeList = launcherRoot.isClipboardMode ? clipList : appList;
 
                         if (event.key === Qt.Key_Down) {
                             if (activeList.currentIndex < activeList.count - 1) {
@@ -159,19 +205,24 @@ Item {
                             launcherRoot.closeRequested();
                             event.accepted = true;
                         } else if (event.key === Qt.Key_Tab) {
-                            isClipboardMode = !isClipboardMode;
+                            launcherRoot.isClipboardMode = !launcherRoot.isClipboardMode;
                             event.accepted = true;
                         }
                     }
 
                     onAccepted: {
-                        let activeList = isClipboardMode ? clipList : appList;
-
-                        if (activeList.count > 0 && activeList.currentIndex >= 0) {
-                            activeList.currentItem.trigger();
-                        } else if (!isClipboardMode && text.trim() !== "") {
-                            Quickshell.execDetached(["bash", "-c", text.trim()]);
-                            launcherRoot.closeRequested();
+                        if (launcherRoot.isClipboardMode) {
+                            if (clipList.count > 0 && clipList.currentIndex >= 0) {
+                                launcherRoot.copyClip(clipList.model.values[clipList.currentIndex]);
+                            }
+                        } else {
+                            if (appList.count > 0 && appList.currentIndex >= 0) {
+                                launcherRoot.launchApp(appList.model.values[appList.currentIndex]);
+                            } else if (text.trim() !== "") {
+                                launcherRoot.pendingCommand = text.trim();
+                                launcherRoot.closeRequested();
+                                execTimer.restart();
+                            }
                         }
                     }
                 }
@@ -191,7 +242,7 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: "󰃢" // The Broom Icon
+                    text: "󰃢"
                     color: clearArea.containsMouse ? Colors.red : Colors.fg2
                     font.family: Config.fontName
                     font.pixelSize: 16
@@ -223,7 +274,7 @@ Item {
             height: parent.height - searchBar.height - 16
             clip: true
             spacing: 6
-            visible: !isClipboardMode
+            visible: !launcherRoot.isClipboardMode
 
             highlightFollowsCurrentItem: true
             currentIndex: 0
@@ -233,9 +284,24 @@ Item {
                 values: {
                     let search = searchInput.text.toLowerCase().trim();
                     let allApps = DesktopEntries.applications.values;
+
                     if (search === "")
                         return allApps;
-                    return allApps.filter(app => app.name && app.name.toLowerCase().includes(search));
+
+                    return allApps.filter(app => {
+                        if (app.name && app.name.toLowerCase().includes(search))
+                            return true;
+                        if (app.genericName && app.genericName.toLowerCase().includes(search))
+                            return true;
+
+                        if (app.keywords) {
+                            for (let i = 0; i < app.keywords.length; i++) {
+                                if (app.keywords[i].toLowerCase().includes(search))
+                                    return true;
+                            }
+                        }
+                        return false;
+                    });
                 }
             }
 
@@ -250,26 +316,6 @@ Item {
                 border.color: isSelected ? Colors.bg3 : "transparent"
                 border.width: 2
 
-                function trigger() {
-                    let appName = modelData.name.toLowerCase();
-                    let cliApps = ["htop", "btop", "yazi", "ranger", "lf", "cava", "ncmpcpp", "nvtop", "pulsemixer"];
-                    let cliMatch = "";
-
-                    for (let i = 0; i < cliApps.length; i++) {
-                        if (appName.includes(cliApps[i])) {
-                            cliMatch = cliApps[i];
-                            break;
-                        }
-                    }
-
-                    if (cliMatch !== "") {
-                        Quickshell.execDetached([Config.terminalEmulator, "-e", cliMatch]);
-                    } else {
-                        modelData.execute();
-                    }
-                    launcherRoot.closeRequested();
-                }
-
                 MouseArea {
                     id: appArea
                     anchors.fill: parent
@@ -277,7 +323,7 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         appList.currentIndex = index;
-                        delegateRect.trigger();
+                        launcherRoot.launchApp(modelData);
                     }
                 }
 
@@ -312,7 +358,7 @@ Item {
             height: parent.height - searchBar.height - 16
             clip: true
             spacing: 6
-            visible: isClipboardMode
+            visible: launcherRoot.isClipboardMode
 
             highlightFollowsCurrentItem: true
             currentIndex: 0
@@ -342,12 +388,6 @@ Item {
                 border.color: isSelected ? Colors.bg3 : "transparent"
                 border.width: 2
 
-                function trigger() {
-                    let safeLine = modelData.rawLine.replace(/'/g, "'\\''");
-                    Quickshell.execDetached(["bash", "-c", "echo -E '" + safeLine + "' | cliphist decode | wl-copy"]);
-                    launcherRoot.closeRequested();
-                }
-
                 MouseArea {
                     id: clipArea
                     anchors.fill: parent
@@ -355,7 +395,7 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         clipList.currentIndex = index;
-                        clipDelegateRect.trigger();
+                        launcherRoot.copyClip(modelData);
                     }
                 }
 

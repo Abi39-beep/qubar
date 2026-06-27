@@ -1,7 +1,6 @@
+pragma ComponentBehavior: Bound
 import QtQuick
-import Quickshell
 import Quickshell.Services.Mpris
-import Quickshell.Io
 import Qt5Compat.GraphicalEffects
 
 Item {
@@ -9,34 +8,61 @@ Item {
 
     signal closeRequested
 
-    // --- THE ESC KEY FIX ---
     focus: true
-    Keys.onEscapePressed: closeRequested()
+    Keys.onEscapePressed: mediaCtrl.closeRequested()
 
     MouseArea {
         anchors.fill: parent
+        z: -1
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: closeRequested()
+        onClicked: mediaCtrl.closeRequested()
     }
 
-    // --- MPRIS NATIVE BINDINGS ---
+    // ==========================================
+    // 1. NATIVE STATE ENGINE & CLOCK
+    // ==========================================
     property var activePlayer: null
-    readonly property bool hasPlayer: activePlayer !== null
-    readonly property bool isPlaying: hasPlayer && activePlayer.playbackState === 1
+    readonly property bool hasPlayer: mediaCtrl.activePlayer !== null
+    readonly property bool isPlaying: mediaCtrl.hasPlayer && mediaCtrl.activePlayer.playbackState === MprisPlaybackState.Playing
+    readonly property string title: mediaCtrl.hasPlayer && mediaCtrl.activePlayer.metadata && mediaCtrl.activePlayer.metadata["xesam:title"] ? mediaCtrl.activePlayer.metadata["xesam:title"] : "No Media"
 
-    readonly property string title: hasPlayer && activePlayer.metadata && activePlayer.metadata["xesam:title"] ? activePlayer.metadata["xesam:title"] : "No Media"
     readonly property string artist: {
-        if (hasPlayer && activePlayer.metadata && activePlayer.metadata["xesam:artist"]) {
-            let a = activePlayer.metadata["xesam:artist"];
+        if (mediaCtrl.hasPlayer && mediaCtrl.activePlayer.metadata && mediaCtrl.activePlayer.metadata["xesam:artist"]) {
+            let a = mediaCtrl.activePlayer.metadata["xesam:artist"];
             return Array.isArray(a) ? a.join(", ") : String(a);
         }
         return "Unknown Artist";
     }
-    readonly property string artUrl: hasPlayer && activePlayer.metadata && activePlayer.metadata["mpris:artUrl"] ? activePlayer.metadata["mpris:artUrl"] : ""
 
-    property real lengthSec: 0
+    readonly property string artUrl: mediaCtrl.hasPlayer && mediaCtrl.activePlayer.metadata && mediaCtrl.activePlayer.metadata["mpris:artUrl"] ? mediaCtrl.activePlayer.metadata["mpris:artUrl"] : ""
+    readonly property real lengthSec: mediaCtrl.hasPlayer && mediaCtrl.activePlayer.metadata && mediaCtrl.activePlayer.metadata["mpris:length"] ? mediaCtrl.activePlayer.metadata["mpris:length"] / 1000000 : 0
     property real positionSec: 0
+
+    // THE NATIVE CLOCK ENGINE
+    Timer {
+        interval: 500
+        running: true
+        repeat: true
+        onTriggered: {
+            let players = Mpris.players.values;
+            let best = null;
+
+            for (let i = 0; i < players.length; i++) {
+                if (players[i] && players[i].playbackState === MprisPlaybackState.Playing) {
+                    best = players[i];
+                    break;
+                }
+                if (players[i] && !best)
+                    best = players[i];
+            }
+            mediaCtrl.activePlayer = best;
+
+            if (mediaCtrl.hasPlayer && typeof mediaCtrl.activePlayer.position !== "undefined") {
+                mediaCtrl.positionSec = mediaCtrl.activePlayer.position;
+            }
+        }
+    }
 
     function formatTime(totalSeconds) {
         if (totalSeconds <= 0 || isNaN(totalSeconds))
@@ -46,47 +72,12 @@ Item {
         return mins + ":" + (secs < 10 ? "0" : "") + secs;
     }
 
-    Process {
-        id: syncTime
-        command: ["bash", "-c", "echo $(playerctl metadata --format '{{mpris:length}}' 2>/dev/null) $(playerctl position 2>/dev/null)"]
-        stdout: SplitParser {
-            onRead: data => {
-                let parts = data.trim().split(" ");
-                if (parts.length >= 2) {
-                    let rawLen = parseFloat(parts[0]);
-                    let rawPos = parseFloat(parts[1]);
-                    if (!isNaN(rawLen))
-                        mediaCtrl.lengthSec = rawLen / 1000000;
-                    if (!isNaN(rawPos))
-                        mediaCtrl.positionSec = rawPos;
-                }
-            }
-        }
-    }
+    // ==========================================
+    // 2. UI LAYOUT
+    // ==========================================
 
-    Timer {
-        interval: 500
-        running: true
-        repeat: true
-        onTriggered: {
-            let players = Mpris.players.values;
-            let best = null;
-            for (let i = 0; i < players.length; i++) {
-                if (players[i] && players[i].playbackState === 1) {
-                    best = players[i];
-                    break;
-                }
-                if (players[i] && !best)
-                    best = players[i];
-            }
-            mediaCtrl.activePlayer = best;
+    property Item maskItem: imageMask
 
-            if (mediaCtrl.isPlaying)
-                syncTime.running = true;
-        }
-    }
-
-    // --- Rounded Album Art (Linked to Config) ---
     Rectangle {
         id: imageMask
         anchors.fill: parent
@@ -98,21 +89,21 @@ Item {
     Image {
         id: albumArt
         anchors.fill: parent
-        source: artUrl
+        source: mediaCtrl.artUrl
         fillMode: Image.PreserveAspectCrop
-        visible: artUrl !== ""
+        visible: mediaCtrl.artUrl !== ""
         opacity: Config.mediaCtrlArtOpacity
 
         layer.enabled: true
         layer.effect: OpacityMask {
-            maskSource: imageMask
+            maskSource: mediaCtrl.maskItem
         }
     }
 
     Rectangle {
         anchors.fill: parent
         color: Colors.bg1
-        opacity: artUrl !== "" ? Config.mediaCtrlTintOpacity : 0.0
+        opacity: mediaCtrl.artUrl !== "" ? Config.mediaCtrlTintOpacity : 0.0
         radius: Config.mediaCtrlRadius
     }
 
@@ -132,7 +123,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 4
                 Text {
-                    text: title
+                    text: mediaCtrl.title
                     font.bold: true
                     color: Colors.fg0
                     font.family: Config.fontName
@@ -141,7 +132,7 @@ Item {
                     width: parent.width
                 }
                 Text {
-                    text: artist
+                    text: mediaCtrl.artist
                     color: Colors.fg2
                     font.family: Config.fontName
                     font.pixelSize: 13
@@ -155,6 +146,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 12
 
+                // PREVIOUS BUTTON
                 Text {
                     text: "󰒮"
                     font.family: Config.fontName
@@ -167,10 +159,14 @@ Item {
                         anchors.margins: -10
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: Quickshell.execDetached(["playerctl", "previous"])
+                        onClicked: {
+                            if (mediaCtrl.hasPlayer)
+                                mediaCtrl.activePlayer.previous();
+                        }
                     }
                 }
 
+                // PLAY/PAUSE BUTTON
                 Rectangle {
                     width: 44
                     height: 44
@@ -178,22 +174,26 @@ Item {
                     color: playArea.containsMouse ? Colors.blue : Colors.aqua
                     anchors.verticalCenter: parent.verticalCenter
                     Text {
-                        text: isPlaying ? "󰏤" : "󰐊"
+                        text: mediaCtrl.isPlaying ? "󰏤" : "󰐊"
                         font.family: Config.fontName
                         color: Colors.bg0
                         font.pixelSize: 24
                         anchors.centerIn: parent
-                        anchors.horizontalCenterOffset: isPlaying ? 0 : 2
+                        anchors.horizontalCenterOffset: mediaCtrl.isPlaying ? 0 : 2
                     }
                     MouseArea {
                         id: playArea
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: Quickshell.execDetached(["playerctl", "play-pause"])
+                        onClicked: {
+                            if (mediaCtrl.hasPlayer)
+                                mediaCtrl.activePlayer.togglePlaying();
+                        }
                     }
                 }
 
+                // NEXT BUTTON
                 Text {
                     text: "󰒭"
                     font.family: Config.fontName
@@ -206,13 +206,16 @@ Item {
                         anchors.margins: -10
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: Quickshell.execDetached(["playerctl", "next"])
+                        onClicked: {
+                            if (mediaCtrl.hasPlayer)
+                                mediaCtrl.activePlayer.next();
+                        }
                     }
                 }
             }
         }
 
-        // --- BOTTOM SECTION (Straight Progress Bar) ---
+        // --- BOTTOM SECTION (Progress Bar) ---
         Row {
             anchors.bottom: parent.bottom
             anchors.left: parent.left
@@ -220,7 +223,7 @@ Item {
             spacing: 12
 
             Text {
-                text: formatTime(positionSec)
+                text: mediaCtrl.formatTime(mediaCtrl.positionSec)
                 color: Colors.fg2
                 font.family: Config.fontName
                 font.pixelSize: 11
@@ -243,14 +246,14 @@ Item {
 
                 Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
-                    width: lengthSec > 0 ? Math.min((positionSec / lengthSec), 1.0) * parent.width : 0
+                    width: mediaCtrl.lengthSec > 0 ? Math.min((mediaCtrl.positionSec / mediaCtrl.lengthSec), 1.0) * parent.width : 0
                     height: 4
                     radius: 2
                     color: Colors.aqua
                 }
 
                 Rectangle {
-                    x: lengthSec > 0 ? Math.max(0, Math.min((positionSec / lengthSec) * parent.width, parent.width) - width / 2) : 0
+                    x: mediaCtrl.lengthSec > 0 ? Math.max(0, Math.min((mediaCtrl.positionSec / mediaCtrl.lengthSec) * parent.width, parent.width) - width / 2) : 0
                     anchors.verticalCenter: parent.verticalCenter
                     width: 14
                     height: 14
@@ -264,18 +267,18 @@ Item {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     onClicked: mouse => {
-                        if (lengthSec > 0) {
+                        if (mediaCtrl.lengthSec > 0 && mediaCtrl.hasPlayer) {
                             let percentage = mouse.x / width;
-                            let seekTarget = percentage * lengthSec;
-                            Quickshell.execDetached(["playerctl", "position", seekTarget.toString()]);
-                            mediaCtrl.positionSec = seekTarget;
+                            let seekTargetSec = percentage * mediaCtrl.lengthSec;
+                            mediaCtrl.activePlayer.position = seekTargetSec;
+                            mediaCtrl.positionSec = seekTargetSec;
                         }
                     }
                 }
             }
 
             Text {
-                text: formatTime(lengthSec)
+                text: mediaCtrl.formatTime(mediaCtrl.lengthSec)
                 color: Colors.fg2
                 font.family: Config.fontName
                 font.pixelSize: 11

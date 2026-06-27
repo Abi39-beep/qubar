@@ -1,173 +1,75 @@
 import QtQuick
 import Quickshell
-import Quickshell.Io
+import Quickshell.Bluetooth
 
 Item {
     id: btMenuRoot
     signal backRequested
 
     property string expandedMac: ""
-    property bool isRadioOn: false
-    property bool isScanning: false
-    property bool isToggling: false
 
+    // ==========================================
+    // 1. NATIVE STATE ENGINE
+    // ==========================================
+    property var adapter: Bluetooth.defaultAdapter
+    property bool isRadioOn: adapter ? adapter.enabled : false
+
+    // Smart Scanning: Only scan quietly in the background while the menu is open
     onVisibleChanged: {
-        if (!visible) {
-            expandedMac = "";
-            if (isScanning)
-                toggleScan(false);
+        if (visible) {
+            if (adapter && !adapter.discovering && adapter.enabled) {
+                adapter.discovering = true;
+            }
+            sortTrigger++; // Force an initial sort when opened
         } else {
-            fetchDevicesProc.running = false;
-            fetchDevicesProc.running = true;
-        }
-    }
-
-    onIsRadioOnChanged: {
-        if (!isRadioOn) {
-            btModel.clear();
-            if (isScanning)
-                toggleScan(false);
-        }
-    }
-
-    Timer {
-        id: toggleLockTimer
-        interval: 2000
-        onTriggered: btMenuRoot.isToggling = false
-    }
-
-    Process {
-        id: radioProc
-        command: ["bash", "-c", "bluetoothctl show | grep -q 'Powered: yes' && echo 'on' || echo 'off'"]
-        running: true
-        stdout: SplitParser {
-            onRead: data => {
-                if (!btMenuRoot.isToggling) {
-                    btMenuRoot.isRadioOn = (data.trim() === "on");
-                }
+            expandedMac = "";
+            if (adapter && adapter.discovering) {
+                adapter.discovering = false;
             }
         }
     }
+
+    // ==========================================
+    // 2. THE ZERO-LAG BUBBLE SORT ENGINE
+    // Constantly keeps connected devices at the top automatically
+    // ==========================================
+    property int sortTrigger: 0
+
+    // Lightweight 1-second pulse to refresh the order
     Timer {
-        id: radioTimer
-        interval: 3000
-        running: true
-        repeat: true
-        onTriggered: radioProc.running = true
-    }
-
-    Process {
-        id: scanProc
-        command: ["bluetoothctl", "scan", "on"]
-        running: false
-
-        stdout: SplitParser {
-            onRead: data => { /* Silently drain the text pipe */ }
-        }
-    }
-
-    Timer {
-        id: scanTimer
-        interval: 15000
-        onTriggered: toggleScan(false)
-    }
-
-    function toggleScan(start) {
-        btMenuRoot.isScanning = start;
-        if (start) {
-            scanProc.running = false;
-            scanProc.running = true;
-            scanTimer.restart();
-        } else {
-            scanProc.running = false;
-            scanTimer.stop();
-            Qt.createQmlObject('import Quickshell.Io; Process { command: ["bluetoothctl", "scan", "off"]; running: true }', btMenuRoot, "stopProc");
-        }
-    }
-
-    Process {
-        id: actionProc
-        running: false
-        onExited: {
-            fetchDevicesProc.running = false;
-            fetchDevicesProc.running = true;
-        }
-    }
-
-    Timer {
-        interval: 3000
+        interval: 1000
         running: btMenuRoot.visible
         repeat: true
-        onTriggered: {
-            fetchDevicesProc.running = false;
-            fetchDevicesProc.running = true;
-        }
+        onTriggered: btMenuRoot.sortTrigger++
     }
 
-    Process {
-        id: fetchDevicesProc
-        command: ["bash", "-c", "connected=$(bluetoothctl devices Connected | awk '{print $2}'); bluetoothctl devices | while read -r _ mac name; do if echo \"$connected\" | grep -q \"$mac\"; then echo \"yes|$mac|$name\"; else echo \"no|$mac|$name\"; fi; done"]
-        running: true
+    function getSortedDevices() {
+        let dummy = sortTrigger; // Subscribes to the timer pulse
 
-        stdout: SplitParser {
-            onRead: data => {
-                let lines = data.split("\n");
-                for (let i = 0; i < lines.length; i++) {
-                    let line = lines[i].trim();
-                    if (!line)
-                        continue;
+        if (!adapter || !adapter.enabled || !Bluetooth.devices)
+            return [];
 
-                    let parts = line.split("|");
-                    if (parts.length >= 3) {
-                        let isActive = (parts[0] === "yes");
-                        let mac = parts[1];
-                        let name = parts.slice(2).join("|").trim();
-
-                        if (name === "")
-                            name = mac;
-
-                        let found = false;
-                        for (let j = 0; j < btModel.count; j++) {
-                            if (btModel.get(j).mac === mac) {
-                                if (btModel.get(j).isActive !== isActive) {
-                                    btModel.setProperty(j, "isActive", isActive);
-                                    if (isActive)
-                                        btModel.move(j, 0, 1);
-                                    else
-                                        btModel.move(j, btModel.count - 1, 1);
-                                }
-
-                                if (btModel.get(j).name !== name && name !== mac) {
-                                    btModel.setProperty(j, "name", name);
-                                }
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (!found) {
-                            if (isActive)
-                                btModel.insert(0, {
-                                    "name": name,
-                                    "mac": mac,
-                                    "isActive": isActive
-                                });
-                            else
-                                btModel.append({
-                                    "name": name,
-                                    "mac": mac,
-                                    "isActive": isActive
-                                });
-                        }
-                    }
-                }
+        let devs = [];
+        let raw = Bluetooth.devices.values;
+        if (raw) {
+            for (let i = 0; i < raw.length; i++) {
+                devs.push(raw[i]);
             }
         }
+
+        // The sorting magic: pushes connected devices to the front!
+        devs.sort((a, b) => {
+            let aConn = a.connected ? 1 : 0;
+            let bConn = b.connected ? 1 : 0;
+            return bConn - aConn;
+        });
+
+        return devs;
     }
 
-    ListModel {
-        id: btModel
-    }
-
+    // ==========================================
+    // 3. UI LAYOUT
+    // ==========================================
     Column {
         anchors.fill: parent
         spacing: 16
@@ -182,7 +84,6 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 12
 
-                // THE FIX: Premium Back Button Background
                 Rectangle {
                     width: 36
                     height: 36
@@ -223,49 +124,15 @@ Item {
                 }
             }
 
+            // --- HEADER RIGHT CONTROLS ---
             Row {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
 
-                // THE FIX: Premium Scan Button Background to match!
-                Rectangle {
-                    width: 36
-                    height: 36
-                    radius: 18
-                    color: scanArea.containsMouse ? Colors.bg2 : Colors.bg1
+                // THE VISUAL SCAN BUTTON HAS BEEN COMPLETELY REMOVED!
 
-                    Behavior on color {
-                        ColorAnimation {
-                            duration: 150
-                        }
-                    }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "󰑐"
-                        font.family: Config.fontName
-                        font.pixelSize: 20
-                        color: btMenuRoot.isScanning ? Colors.aqua : Colors.fg0
-
-                        RotationAnimation on rotation {
-                            loops: Animation.Infinite
-                            from: 0
-                            to: 360
-                            duration: 1000
-                            running: btMenuRoot.isScanning
-                        }
-                    }
-
-                    MouseArea {
-                        id: scanArea
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        hoverEnabled: true
-                        onClicked: toggleScan(!btMenuRoot.isScanning)
-                    }
-                }
-
+                // POWER TOGGLE
                 Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 44
@@ -278,7 +145,6 @@ Item {
                         radius: 11
 
                         color: btMenuRoot.isRadioOn ? (pwrArea.containsMouse ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.8) : Colors.aqua) : (pwrArea.containsMouse ? Colors.bg2 : Colors.bg1)
-
                         border.color: btMenuRoot.isRadioOn ? Colors.aqua : Colors.bg3
                         border.width: 1
 
@@ -294,7 +160,6 @@ Item {
                             radius: 7
                             anchors.verticalCenter: parent.verticalCenter
                             x: btMenuRoot.isRadioOn ? parent.width - width - 4 : 4
-
                             color: btMenuRoot.isRadioOn ? Colors.bg0 : (pwrArea.containsMouse ? Colors.fg2 : Colors.fg3)
 
                             Behavior on x {
@@ -317,18 +182,14 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         hoverEnabled: true
                         onClicked: {
-                            btMenuRoot.isToggling = true;
-                            toggleLockTimer.restart();
-
-                            if (btMenuRoot.isRadioOn && btMenuRoot.isScanning) {
-                                toggleScan(false);
+                            if (adapter) {
+                                adapter.enabled = !adapter.enabled;
+                                if (!adapter.enabled && adapter.discovering) {
+                                    adapter.discovering = false;
+                                } else if (adapter.enabled) {
+                                    adapter.discovering = true; // Start scanning silently when turned back on
+                                }
                             }
-
-                            let cmd = btMenuRoot.isRadioOn ? "bluetoothctl power off" : "bluetoothctl power on";
-                            actionProc.command = ["bash", "-c", cmd];
-                            actionProc.running = true;
-
-                            btMenuRoot.isRadioOn = !btMenuRoot.isRadioOn;
                         }
                     }
                 }
@@ -341,7 +202,7 @@ Item {
             color: Colors.bg3
         }
 
-        // --- BLUETOOTH LIST ---
+        // --- DYNAMIC BLUETOOTH LIST ---
         Flickable {
             width: parent.width
             height: parent.height - 69
@@ -355,18 +216,25 @@ Item {
                 spacing: 8
 
                 Repeater {
-                    model: btModel
+                    // THE FIX: Binds perfectly to our custom auto-sorting function
+                    model: btMenuRoot.getSortedDevices()
+
                     Rectangle {
                         id: btBox
                         width: parent.width
-                        property bool isExpanded: btMenuRoot.expandedMac === model.mac
+
+                        property string mac: modelData.address || ""
+                        property bool isActive: modelData.connected || false
+                        property string devName: modelData.name || modelData.deviceName || mac
+
+                        property bool isExpanded: btMenuRoot.expandedMac === mac
 
                         height: isExpanded ? 96 : 48
                         radius: 12
                         clip: true
 
-                        color: model.isActive ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.15) : (btMouseArea.containsMouse ? Colors.bg3 : Colors.bg2)
-                        border.color: model.isActive ? Colors.aqua : (btMouseArea.containsMouse ? Colors.fg3 : Colors.bg3)
+                        color: isActive ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.15) : (btMouseArea.containsMouse ? Colors.bg3 : Colors.bg2)
+                        border.color: isActive ? Colors.aqua : (btMouseArea.containsMouse ? Colors.fg3 : Colors.bg3)
                         border.width: 1
 
                         Behavior on height {
@@ -396,11 +264,11 @@ Item {
                                 anchors.leftMargin: 16
                                 anchors.right: statusBadge.visible ? statusBadge.left : parent.right
                                 anchors.rightMargin: 16
-                                text: model.name
+                                text: parent.parent.devName
                                 font.family: Config.fontName
                                 font.pixelSize: 14
-                                font.bold: model.isActive
-                                color: model.isActive ? Colors.aqua : Colors.fg0
+                                font.bold: parent.parent.isActive
+                                color: parent.parent.isActive ? Colors.aqua : Colors.fg0
                                 elide: Text.ElideRight
                             }
 
@@ -409,7 +277,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 anchors.right: parent.right
                                 anchors.rightMargin: 16
-                                visible: model.isActive
+                                visible: parent.parent.isActive
                                 text: "Connected"
                                 color: Colors.aqua
                                 font.family: Config.fontName
@@ -422,7 +290,7 @@ Item {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 hoverEnabled: true
-                                onClicked: btMenuRoot.expandedMac = (btMenuRoot.expandedMac === model.mac) ? "" : model.mac
+                                onClicked: btMenuRoot.expandedMac = (btMenuRoot.expandedMac === parent.parent.mac) ? "" : parent.parent.mac
                             }
                         }
 
@@ -448,8 +316,8 @@ Item {
                                     height: 36
                                     radius: 8
 
-                                    color: model.isActive ? (connArea.containsMouse ? Colors.bg3 : Colors.bg2) : (connArea.containsMouse ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.8) : Colors.aqua)
-                                    border.color: model.isActive ? Colors.bg3 : Colors.aqua
+                                    color: btBox.isActive ? (connArea.containsMouse ? Colors.bg3 : Colors.bg2) : (connArea.containsMouse ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.8) : Colors.aqua)
+                                    border.color: btBox.isActive ? Colors.bg3 : Colors.aqua
                                     border.width: 1
 
                                     Behavior on color {
@@ -460,8 +328,8 @@ Item {
 
                                     Text {
                                         anchors.centerIn: parent
-                                        text: model.isActive ? "Disconnect" : "Connect"
-                                        color: model.isActive ? Colors.fg0 : Colors.bg0
+                                        text: btBox.isActive ? "Disconnect" : "Connect"
+                                        color: btBox.isActive ? Colors.fg0 : Colors.bg0
                                         font.family: Config.fontName
                                         font.pixelSize: 13
                                         font.bold: true
@@ -473,12 +341,10 @@ Item {
                                         cursorShape: Qt.PointingHandCursor
                                         hoverEnabled: true
                                         onClicked: {
-                                            actionProc.running = false;
-                                            let cmd = model.isActive ? "bluetoothctl disconnect '" + model.mac + "'" : "bluetoothctl pair '" + model.mac + "'; bluetoothctl trust '" + model.mac + "'; bluetoothctl connect '" + model.mac + "'";
-
-                                            actionProc.command = ["bash", "-c", cmd];
-                                            actionProc.running = true;
+                                            let cmd = btBox.isActive ? "bluetoothctl disconnect '" + btBox.mac + "'" : "bluetoothctl pair '" + btBox.mac + "'; bluetoothctl trust '" + btBox.mac + "'; bluetoothctl connect '" + btBox.mac + "'";
+                                            Quickshell.execDetached(["bash", "-c", cmd]);
                                             btMenuRoot.expandedMac = "";
+                                            btMenuRoot.sortTrigger++; // Instantly bumps it after clicking!
                                         }
                                     }
                                 }
@@ -488,11 +354,13 @@ Item {
                                     height: 36
                                     radius: 8
                                     color: forgetArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.8) : Colors.red
+
                                     Behavior on color {
                                         ColorAnimation {
                                             duration: 150
                                         }
                                     }
+
                                     Text {
                                         anchors.centerIn: parent
                                         text: "Forget"
@@ -508,19 +376,9 @@ Item {
                                         cursorShape: Qt.PointingHandCursor
                                         hoverEnabled: true
                                         onClicked: {
-                                            actionProc.running = false;
-                                            actionProc.command = ["bash", "-c", "bluetoothctl remove '" + model.mac + "'"];
-                                            actionProc.running = true;
+                                            Quickshell.execDetached(["bash", "-c", "bluetoothctl remove '" + btBox.mac + "'"]);
                                             btMenuRoot.expandedMac = "";
-
-                                            for (let j = 0; j < btModel.count; j++) {
-                                                if (btModel.get(j).mac === model.mac) {
-                                                    btModel.remove(j);
-                                                    break;
-                                                }
-                                            }
-
-                                            toggleScan(true);
+                                            btMenuRoot.sortTrigger++;
                                         }
                                     }
                                 }
