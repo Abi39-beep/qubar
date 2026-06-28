@@ -5,23 +5,16 @@ Rectangle {
     id: root
     signal openMenuRequested
 
-    // ==========================================
-    // 1. TRUE NATIVE DECLARATIVE BINDINGS
-    // ==========================================
     property var wifiDevice: Networking.devices.values.find(d => d.type === DeviceType.Wifi)
     property var activeNetwork: wifiDevice ? wifiDevice.networks.values.find(n => n.connected) : null
-
     property bool isRadioOn: Networking.wifiEnabled
     property string currentSsid: activeNetwork ? activeNetwork.name : ""
     property real currentSignal: activeNetwork ? activeNetwork.signalStrength : 0
-
     property bool isHovered: menuArea.containsMouse || circleArea.containsMouse
 
     height: Config.ccToggleHeight
     radius: Config.ccToggleRadius
-
     color: isRadioOn ? (isHovered ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.85) : Colors.aqua) : (isHovered ? Colors.bg1 : Colors.bg0)
-
     border.color: Colors.bg3
     border.width: isRadioOn ? 0 : 1
 
@@ -43,9 +36,6 @@ Rectangle {
         return 0.35;
     }
 
-    // ==========================================
-    // 2. UI LAYOUT
-    // ==========================================
     Row {
         anchors.fill: parent
         anchors.margins: 6
@@ -55,7 +45,6 @@ Rectangle {
             width: parent.height
             height: parent.height
             radius: width / 2
-
             color: root.isRadioOn ? (circleArea.containsMouse ? Qt.rgba(0, 0, 0, 0.45) : Qt.rgba(0, 0, 0, 0.30)) : (circleArea.containsMouse ? Colors.bg3 : Colors.bg2)
 
             Behavior on color {
@@ -69,9 +58,9 @@ Rectangle {
                 text: ""
                 font.family: Config.fontName
                 font.pixelSize: Config.fontSizeCcToggleIcon
-
                 color: root.isRadioOn ? Colors.bg0 : Colors.fg0
                 opacity: root.isRadioOn ? root.getWifiOpacity(root.currentSignal) : 0.6
+
                 Behavior on opacity {
                     NumberAnimation {
                         duration: 300
@@ -85,7 +74,6 @@ Rectangle {
                 cursorShape: Qt.PointingHandCursor
                 hoverEnabled: true
                 onClicked: {
-                    // Instantly toggles the Quickshell Networking Singleton
                     Networking.wifiEnabled = !Networking.wifiEnabled;
                 }
             }

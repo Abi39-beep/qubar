@@ -6,13 +6,8 @@ Item {
     signal backRequested
 
     property string expandedSsid: ""
-
-    // ==========================================
-    // 1. NATIVE STATE ENGINE
-    // ==========================================
     property var wifiDevice: Networking.devices.values.find(d => d.type === DeviceType.Wifi)
     property bool isRadioOn: Networking.wifiEnabled
-
     property var activeNetworkList: []
 
     onVisibleChanged: {
@@ -26,9 +21,6 @@ Item {
         }
     }
 
-    // ==========================================
-    // 2. THE UI FREEZE & SORT ENGINE
-    // ==========================================
     Timer {
         interval: 1000
         running: wifiMenuRoot.visible
@@ -71,9 +63,7 @@ Item {
         activeNetworkList = devs;
     }
 
-    // ==========================================
-    // 3. UI LAYOUT
-    // ==========================================
+    // UI LAYOUT
     Column {
         anchors.fill: parent
         spacing: 16
@@ -291,7 +281,6 @@ Item {
                                 hoverEnabled: true
                                 onClicked: {
                                     if (wifiMenuRoot.expandedSsid === modelData.ssid) {
-                                        // Unfreeze when closed
                                         wifiMenuRoot.expandedSsid = "";
                                         wifiMenuRoot.updateNetworkList();
                                     } else {

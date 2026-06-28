@@ -7,20 +7,15 @@ Item {
     signal backRequested
 
     property string expandedMac: ""
-
-    // ==========================================
-    // 1. NATIVE STATE ENGINE
-    // ==========================================
     property var adapter: Bluetooth.defaultAdapter
     property bool isRadioOn: adapter ? adapter.enabled : false
 
-    // Smart Scanning: Only scan quietly in the background while the menu is open
     onVisibleChanged: {
         if (visible) {
             if (adapter && !adapter.discovering && adapter.enabled) {
                 adapter.discovering = true;
             }
-            sortTrigger++; // Force an initial sort when opened
+            sortTrigger++;
         } else {
             expandedMac = "";
             if (adapter && adapter.discovering) {
@@ -29,13 +24,8 @@ Item {
         }
     }
 
-    // ==========================================
-    // 2. THE ZERO-LAG BUBBLE SORT ENGINE
-    // Constantly keeps connected devices at the top automatically
-    // ==========================================
     property int sortTrigger: 0
 
-    // Lightweight 1-second pulse to refresh the order
     Timer {
         interval: 1000
         running: btMenuRoot.visible
@@ -44,7 +34,7 @@ Item {
     }
 
     function getSortedDevices() {
-        let dummy = sortTrigger; // Subscribes to the timer pulse
+        let dummy = sortTrigger;
 
         if (!adapter || !adapter.enabled || !Bluetooth.devices)
             return [];
@@ -57,7 +47,6 @@ Item {
             }
         }
 
-        // The sorting magic: pushes connected devices to the front!
         devs.sort((a, b) => {
             let aConn = a.connected ? 1 : 0;
             let bConn = b.connected ? 1 : 0;
@@ -67,9 +56,7 @@ Item {
         return devs;
     }
 
-    // ==========================================
-    // 3. UI LAYOUT
-    // ==========================================
+    // UI LAYOUT
     Column {
         anchors.fill: parent
         spacing: 16
@@ -130,9 +117,6 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
 
-                // THE VISUAL SCAN BUTTON HAS BEEN COMPLETELY REMOVED!
-
-                // POWER TOGGLE
                 Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 44
@@ -187,7 +171,7 @@ Item {
                                 if (!adapter.enabled && adapter.discovering) {
                                     adapter.discovering = false;
                                 } else if (adapter.enabled) {
-                                    adapter.discovering = true; // Start scanning silently when turned back on
+                                    adapter.discovering = true;
                                 }
                             }
                         }
@@ -216,7 +200,6 @@ Item {
                 spacing: 8
 
                 Repeater {
-                    // THE FIX: Binds perfectly to our custom auto-sorting function
                     model: btMenuRoot.getSortedDevices()
 
                     Rectangle {
@@ -344,7 +327,7 @@ Item {
                                             let cmd = btBox.isActive ? "bluetoothctl disconnect '" + btBox.mac + "'" : "bluetoothctl pair '" + btBox.mac + "'; bluetoothctl trust '" + btBox.mac + "'; bluetoothctl connect '" + btBox.mac + "'";
                                             Quickshell.execDetached(["bash", "-c", cmd]);
                                             btMenuRoot.expandedMac = "";
-                                            btMenuRoot.sortTrigger++; // Instantly bumps it after clicking!
+                                            btMenuRoot.sortTrigger++;
                                         }
                                     }
                                 }

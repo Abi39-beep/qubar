@@ -8,8 +8,6 @@ Item {
     id: launcherRoot
     signal closeRequested
 
-    // --- MODE SWITCHER ---
-    // 0 = Apps, 1 = Clipboard
     property bool isClipboardMode: false
 
     // ==========================================
@@ -94,7 +92,6 @@ Item {
         }
     }
 
-    // --- SMART CONFIG-DRIVEN HEIGHT MATH ---
     property int dynamicHeight: {
         let activeList = launcherRoot.isClipboardMode ? clipList : appList;
         let visibleItems = Math.min(activeList.count, Config.launcherMaxItems);
@@ -431,7 +428,6 @@ Item {
                     spacing: 8
                     visible: clipDelegateRect.isRowHovered
 
-                    // COPY ICON
                     Rectangle {
                         id: copyIconRect
                         width: 32
@@ -471,7 +467,6 @@ Item {
                         }
                     }
 
-                    // DELETE ICON
                     Rectangle {
                         width: 32
                         height: 32

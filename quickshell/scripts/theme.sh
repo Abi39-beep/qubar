@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-# THE FIX: Explicitly define the system path so Quickshell can find kitty and killall!
 export PATH=$PATH:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
 
 selected_theme="$1"
@@ -88,11 +87,9 @@ fi
 
 # --- KITTY TERMINAL ---
 if pgrep -x kitty > /dev/null; then
-    # Strategy A: Update the file timestamp so Kitty's internal engine detects the change!
     touch "$HOME/.config/kitty/kitty.conf" 2>/dev/null || true
     killall -SIGUSR1 kitty 2>/dev/null || true
 
-    # Strategy B: Directly inject the colors via sockets (catches any stubborn windows)
     for socket in /tmp/kitty-*; do
         if [ -e "$socket" ]; then
             kitty @ --to "unix:$socket" set-colors -a "$THEME_DIR/$selected_theme/kitty/$selected_theme.conf" 2>/dev/null || true
@@ -102,20 +99,14 @@ fi
 
 # --- FOOT TERMINAL ---
 if pgrep -x foot > /dev/null || pgrep -x footd > /dev/null; then
-    # THE FIX: 'sed -i' physically creates a new file inode.
-    # This acts as a hard change and 100% forces Foot's file-watcher to auto-reload!
     sed -i -e '$a\' "$HOME/.config/foot/foot.ini" 2>/dev/null || true
 
-    # Send the manual signals just as a backup
     pkill -USR1 -x foot 2>/dev/null || true
     pkill -USR1 -x footd 2>/dev/null || true
 fi
 
 # --- HYPRLAND ---
-# Using the native hyprctl command to reload configs (bypassing the dispatch error)
 hyprctl reload 2>/dev/null || true
 
 # --- QUICKSHELL ---
-# THE MAGIC FIX: We completely bypass 'hyprctl dispatch exec'.
-# 'nohup' and 'disown' perfectly detach Quickshell so it restarts cleanly in the background!
 nohup bash "$HOME/.config/quickshell/reload.sh" >/dev/null 2>&1 & disown

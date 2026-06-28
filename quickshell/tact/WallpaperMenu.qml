@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -19,18 +20,14 @@ Item {
         }
     }
 
-    // ==========================================
-    // THE FIX: The Smart Reset Function
-    // Forces the selection to snap back to the currently applied wallpaper
-    // ==========================================
     function resetSelection() {
         if (wallRoot.activeWallpaper === "")
             return;
 
         for (let i = 0; i < wallModel.count; i++) {
             if (wallModel.get(i).filePath === wallRoot.activeWallpaper) {
-                grid.currentIndex = i; // Move keyboard focus
-                grid.positionViewAtIndex(i, GridView.Contain); // Scroll to it if it's hidden!
+                grid.currentIndex = i;
+                grid.positionViewAtIndex(i, GridView.Contain);
                 break;
             }
         }
@@ -39,7 +36,7 @@ Item {
     onVisibleChanged: {
         if (visible) {
             grabFocusTimer.restart();
-            resetSelection(); // Trigger the reset every time you open the menu!
+            wallRoot.resetSelection();
         }
     }
 
@@ -61,6 +58,8 @@ Item {
                 }
             }
         }
+
+        // qmllint disable signal-handler-parameters
         onExited: {
             if (grid.currentIndex === -1)
                 grid.currentIndex = 0;
@@ -76,14 +75,14 @@ Item {
             onRead: data => {
                 let path = data.trim();
                 wallRoot.activeWallpaper = path;
-                resetSelection(); // Initial snap when first loaded
+                wallRoot.resetSelection();
             }
         }
     }
 
     function applyWallpaper(path) {
         wallRoot.activeWallpaper = path;
-        resetSelection(); // Lock it in when applied
+        wallRoot.resetSelection();
         let scriptPath = Quickshell.env("HOME") + "/.config/quickshell/scripts/set_wallpaper.sh";
         Quickshell.execDetached(["bash", scriptPath, path]);
     }
@@ -123,6 +122,7 @@ Item {
                         font.pixelSize: 18
                         color: Colors.fg0
                     }
+
                     MouseArea {
                         id: backArea
                         anchors.fill: parent
@@ -155,55 +155,66 @@ Item {
 
             focus: true
 
-            Keys.onLeftPressed: {
+            Keys.onLeftPressed: event => {
                 if (currentIndex > 0)
                     currentIndex--;
                 event.accepted = true;
             }
-            Keys.onRightPressed: {
+
+            Keys.onRightPressed: event => {
                 if (currentIndex < wallModel.count - 1)
                     currentIndex++;
                 event.accepted = true;
             }
-            Keys.onUpPressed: {
+
+            Keys.onUpPressed: event => {
                 if (currentIndex >= 2)
                     currentIndex -= 2;
                 event.accepted = true;
             }
-            Keys.onDownPressed: {
+
+            Keys.onDownPressed: event => {
                 if (currentIndex + 2 < wallModel.count)
                     currentIndex += 2;
                 else if (currentIndex + 1 < wallModel.count)
                     currentIndex++;
                 event.accepted = true;
             }
-            Keys.onReturnPressed: {
+
+            Keys.onReturnPressed: event => {
                 if (currentIndex >= 0 && currentIndex < wallModel.count)
-                    applyWallpaper(wallModel.get(currentIndex).filePath);
+                    wallRoot.applyWallpaper(wallModel.get(currentIndex).filePath);
                 event.accepted = true;
             }
-            Keys.onEnterPressed: {
+
+            Keys.onEnterPressed: event => {
                 if (currentIndex >= 0 && currentIndex < wallModel.count)
-                    applyWallpaper(wallModel.get(currentIndex).filePath);
+                    wallRoot.applyWallpaper(wallModel.get(currentIndex).filePath);
                 event.accepted = true;
             }
-            Keys.onEscapePressed: {
+
+            Keys.onEscapePressed: event => {
                 wallRoot.backRequested();
                 event.accepted = true;
             }
 
             delegate: Item {
+                id: delegateRoot
+                required property int index
+                required property string filePath
+
                 width: grid.cellWidth
                 height: grid.cellHeight
 
                 z: grid.currentIndex === index ? 10 : 1
 
                 Item {
+                    id: innerContainer
                     anchors.fill: parent
                     anchors.margins: 12
 
-                    property bool isActive: wallRoot.activeWallpaper === filePath
-                    property bool isFocused: grid.currentIndex === index
+                    property bool isActive: wallRoot.activeWallpaper === delegateRoot.filePath
+                    property bool isFocused: grid.currentIndex === delegateRoot.index
 
                     // The Pop Animation
                     scale: isFocused ? 1.08 : 1.0
@@ -218,12 +229,11 @@ Item {
                     Image {
                         id: rawImg
                         anchors.fill: parent
-                        source: "file://" + filePath
+                        source: "file://" + delegateRoot.filePath
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         cache: true
                         sourceSize.width: 300
-                        sourceSize.height: 200
                         visible: false
                     }
 
@@ -258,7 +268,6 @@ Item {
                         anchors.fill: parent
                         radius: 12
                         color: "transparent"
-
                         border.color: parent.isActive ? Colors.aqua : (parent.isFocused ? Colors.fg0 : "transparent")
                         border.width: parent.isActive ? 2 : (parent.isFocused ? 1 : 0)
 
@@ -275,9 +284,9 @@ Item {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            grid.currentIndex = index;
+                            grid.currentIndex = delegateRoot.index;
                             grabFocusTimer.restart();
-                            applyWallpaper(filePath);
+                            wallRoot.applyWallpaper(delegateRoot.filePath);
                         }
                     }
                 }

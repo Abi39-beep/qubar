@@ -1,5 +1,4 @@
 import QtQuick
-import Quickshell
 
 Item {
     id: osdRoot
@@ -56,10 +55,7 @@ Item {
                 width: parent.width * Math.max(0, Math.min(1, osdRoot.percentage))
                 color: osdRoot.barColor
 
-                // --- THE FIX IS HERE ---
                 Behavior on width {
-                    // Only animate if the OSD is fully visible on screen!
-                    // Otherwise, snap instantly to the correct percentage.
                     enabled: osdRoot.opacity === 1
                     NumberAnimation {
                         duration: 150

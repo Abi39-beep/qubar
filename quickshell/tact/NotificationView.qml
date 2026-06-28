@@ -1,24 +1,23 @@
 import QtQuick
 import Quickshell
-import Quickshell.Services.Notifications
 
 Item {
     id: notifRoot
 
     property var activeNotif: null
     signal dismissed
-
     property real timeoutProgress: 1.0
 
-    // --- THE MAGIC HEIGHT CALCULATOR ---
-    // Takes the height of your text, adds the top/bottom margins + the blue bar height + extra padding.
-    // Math.max() ensures it never shrinks smaller than your Config.notifHeight!
+    clip: true
+
     property int dynamicHeight: Math.max(Config.notifHeight, textColumn.implicitHeight + (Config.notifMargin * 2) + Config.notifBarHeight + 12)
 
     onActiveNotifChanged: {
-        if (activeNotif) {
-            timeoutProgress = 1.0;
-            progressAnim.restart();
+        if (notifRoot.activeNotif) {
+            console.log("Debug expireTimeout:", notifRoot.activeNotif.expireTimeout);
+            progressAnim.stop();
+            notifRoot.timeoutProgress = 1.0;
+            progressAnim.start();
         } else {
             progressAnim.stop();
         }
@@ -32,8 +31,13 @@ Item {
         onExited: progressAnim.resume()
 
         onClicked: {
-            if (activeNotif)
-                activeNotif.dismiss();
+            if (notifRoot.activeNotif) {
+                if (typeof notifRoot.activeNotif.invokeDefaultAction === "function") {
+                    notifRoot.activeNotif.invokeDefaultAction();
+                } else {
+                    notifRoot.activeNotif.dismiss();
+                }
+            }
             notifRoot.dismissed();
         }
     }
@@ -48,7 +52,16 @@ Item {
             height: Config.notifIconBoxSize
             radius: Config.notifIconBoxRadius
             color: Colors.bg0
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.top: parent.top
+
+            Image {
+                anchors.centerIn: parent
+                width: Config.notifIconBoxSize - 12
+                height: Config.notifIconBoxSize - 12
+                source: notifRoot.activeNotif && notifRoot.activeNotif.appIcon ? Quickshell.iconPath(notifRoot.activeNotif.appIcon) : ""
+                fillMode: Image.PreserveAspectFit
+                visible: notifRoot.activeNotif && notifRoot.activeNotif.appIcon && notifRoot.activeNotif.appIcon !== ""
+            }
 
             Text {
                 anchors.centerIn: parent
@@ -56,17 +69,18 @@ Item {
                 font.family: Config.fontName
                 font.pixelSize: Config.notifIconFontSize
                 color: Colors.aqua
+                visible: !(notifRoot.activeNotif && notifRoot.activeNotif.appIcon && notifRoot.activeNotif.appIcon !== "")
             }
         }
 
         Column {
-            id: textColumn // Added an ID so the root can measure how tall this text is!
-            anchors.verticalCenter: parent.verticalCenter
+            id: textColumn
+            anchors.top: parent.top
             width: parent.width - Config.notifIconBoxSize - Config.notifSpacing
             spacing: 4
 
             Text {
-                text: activeNotif ? activeNotif.summary : "Notification"
+                text: notifRoot.activeNotif && notifRoot.activeNotif.summary ? notifRoot.activeNotif.summary : "Notification"
                 font.family: Config.fontName
                 font.pixelSize: Config.fontSizeNotifTitle
                 font.bold: true
@@ -76,13 +90,13 @@ Item {
             }
 
             Text {
-                text: activeNotif ? activeNotif.body : ""
+                text: notifRoot.activeNotif && notifRoot.activeNotif.body ? notifRoot.activeNotif.body : ""
                 font.family: Config.fontName
                 font.pixelSize: Config.fontSizeNotifBody
                 color: Colors.fg3
-
                 wrapMode: Text.WordWrap
-                // REMOVED maximumLineCount! It will now wrap and push the height down infinitely!
+                elide: Text.ElideRight
+                maximumLineCount: 4
                 width: parent.width
             }
         }
@@ -95,10 +109,16 @@ Item {
         anchors.bottomMargin: Config.notifBarBottomMargin
         anchors.leftMargin: Config.notifMargin
 
-        width: Math.max(0, (notifRoot.width - (Config.notifMargin * 2)) * notifRoot.timeoutProgress)
+        width: notifRoot.width - (Config.notifMargin * 2)
         height: Config.notifBarHeight
         radius: Config.notifBarHeight / 2
         color: Colors.aqua
+
+        transformOrigin: Item.Left
+        transform: Scale {
+            origin.x: 0
+            xScale: notifRoot.timeoutProgress
+        }
     }
 
     NumberAnimation {
@@ -108,11 +128,11 @@ Item {
         from: 1.0
         to: 0.0
 
-        duration: activeNotif && activeNotif.expireTimeout > 0 ? (activeNotif.expireTimeout * 1000) : Config.notifDefaultTimeout
+        duration: notifRoot.activeNotif && notifRoot.activeNotif.expireTimeout > 0 ? notifRoot.activeNotif.expireTimeout : Config.notifDefaultTimeout
 
         onFinished: {
-            if (activeNotif)
-                activeNotif.expire();
+            if (notifRoot.activeNotif)
+                notifRoot.activeNotif.expire();
             notifRoot.dismissed();
         }
     }

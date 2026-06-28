@@ -5,13 +5,9 @@ Rectangle {
     id: root
     signal openMenuRequested
 
-    // ==========================================
-    // 1. NATIVE STATE ENGINE
-    // ==========================================
     // qmllint disable unresolved-type
     property var adapter: Bluetooth.defaultAdapter
     property bool isRadioOn: adapter ? adapter.enabled : false
-
     property string currentDevice: ""
 
     Timer {
@@ -62,9 +58,7 @@ Rectangle {
         return "󰂯";
     }
 
-    // ==========================================
-    // 2. UI LAYOUT
-    // ==========================================
+    // UI LAYOUT
     Row {
         anchors.fill: parent
         anchors.margins: 6

@@ -1,3 +1,4 @@
+import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
@@ -5,7 +6,6 @@ import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
 import Quickshell.Io
 import Quickshell.Services.Notifications
-import QtQuick
 
 PanelWindow {
     id: pillWindow
@@ -17,29 +17,40 @@ PanelWindow {
         right: false
     }
 
-    // --- THE HYPRLAND MARGIN FIX ---
     WlrLayershell.exclusiveZone: Config.alwaysShowPill ? (Config.pillHeight + Config.topMargin) : 0
 
-    // THE WAYLAND LAYER BOUNCE FIX:
     property bool isBouncing: false
     WlrLayershell.layer: pillWindow.isBouncing ? WlrLayer.Bottom : WlrLayer.Top
+
+    readonly property int viewTime: 0
+    readonly property int viewExpanded: 1
+    readonly property int viewWorkspaces: 2
+    readonly property int viewMedia: 3
+    readonly property int viewPowerMenu: 4
+    readonly property int viewLauncher: 5
+    readonly property int viewOsd: 6
+    readonly property int viewControlCenter: 7
+
+    property int viewState: pillWindow.viewTime
+    property bool isNotifying: false
+    property var currentNotification: null
+    property alias cc: controlCenter
 
     // === THE NOTIFICATION SERVER ===
     NotificationServer {
         id: notificationServer
-        onNotification: {
+        onNotification: notification => {
             notification.tracked = true;
             pillWindow.currentNotification = notification;
             pillWindow.isNotifying = true;
-            // THE FIX: Removed forceActiveFocus() here because our state machine handles it perfectly now!
         }
     }
 
     // === NOTIFICATION FOCUS ===
     property bool holdExclusiveFocus: false
-    WlrLayershell.keyboardFocus: holdExclusiveFocus ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: pillWindow.holdExclusiveFocus ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-    // --- THE ULTIMATE WAYLAND MASK FIX ---
+    // --- THE WAYLAND MASK ---
     implicitWidth: Math.max(Config.expandedWidth, Config.launcherWidth, Config.powerMenuWidth, 600) + 50
     implicitHeight: Math.max(Config.expandedHeight, 600, Config.powerMenuHeight, Config.mediaCtrlHeight) + (Config.topMargin * 2) + 50
 
@@ -49,11 +60,6 @@ PanelWindow {
             item: triggerZone
         }
     }
-
-    property int viewState: 0
-    property bool isNotifying: false
-    property var currentNotification: null
-    property alias cc: controlCenter
 
     // --- THE MASTER WAYLAND FOCUS STATE MACHINE ---
     Timer {
@@ -78,9 +84,8 @@ PanelWindow {
         onTriggered: pillWindow.isBouncing = false
     }
 
-    // THE FIX: A unified function to handle focus for BOTH Menus and Notifications!
     function updateFocusState() {
-        let isOpen = (viewState === 1 || viewState === 3 || viewState === 4 || viewState === 5 || viewState === 7 || isNotifying);
+        let isOpen = (pillWindow.viewState === pillWindow.viewExpanded || pillWindow.viewState === pillWindow.viewMedia || pillWindow.viewState === pillWindow.viewPowerMenu || pillWindow.viewState === pillWindow.viewLauncher || pillWindow.viewState === pillWindow.viewControlCenter || pillWindow.isNotifying);
 
         if (isOpen) {
             dropFocusTimer.stop();
@@ -96,11 +101,9 @@ PanelWindow {
         }
     }
 
-    // Triggers the focus engine if you open a menu OR if a notification pops up!
-    onViewStateChanged: updateFocusState()
-    onIsNotifyingChanged: updateFocusState()
+    onViewStateChanged: pillWindow.updateFocusState()
+    onIsNotifyingChanged: pillWindow.updateFocusState()
 
-    // ==========================================
     property var activeWorkspaces: []
     property bool hasWindows: false
 
@@ -121,6 +124,7 @@ PanelWindow {
                     isFloating = win.floating;
                 else if (win.lastIpcObject && typeof win.lastIpcObject.floating !== "undefined")
                     isFloating = win.lastIpcObject.floating;
+
                 if (!isFloating) {
                     pillWindow.hasWindows = true;
                     return;
@@ -132,45 +136,48 @@ PanelWindow {
         pillWindow.hasWindows = false;
     }
 
-    property bool isMediaPlaying: false
-
-    function checkMediaState() {
-        let players = Mpris.players.values;
-        let playing = false;
-        for (let i = 0; i < players.length; i++) {
-            if (players[i] && players[i].playbackState === 1) {
-                playing = true;
-                break;
-            }
-        }
-        pillWindow.isMediaPlaying = playing;
-    }
+    // ==========================================
+    // MEDIA TRACKING ARCHITECTURE
+    // ==========================================
+    property var activePlayer: null
+    readonly property bool isMediaPlaying: pillWindow.activePlayer !== null && pillWindow.activePlayer.playbackState === MprisPlaybackState.Playing
 
     Timer {
         interval: 500
-        running: true
+        running: Mpris.players.values.length > 0
         repeat: true
         onTriggered: {
-            checkMediaState();
-            checkWindowState();
+            let players = Mpris.players.values;
+            let best = null;
+            for (let i = 0; i < players.length; i++) {
+                if (players[i] && players[i].playbackState === MprisPlaybackState.Playing) {
+                    best = players[i];
+                    break;
+                }
+                if (players[i] && !best)
+                    best = players[i];
+            }
+            pillWindow.activePlayer = best;
         }
     }
 
     property bool isHoverTriggered: false
-    property bool isVisible: Config.alwaysShowPill || !hasWindows || isHoverTriggered || viewState === 1 || viewState === 2 || viewState === 3 || viewState === 4 || viewState === 5 || viewState === 6 || viewState === 7 || isNotifying
+    property bool isVisible: Config.alwaysShowPill || !pillWindow.hasWindows || pillWindow.isHoverTriggered || pillWindow.viewState !== pillWindow.viewTime || pillWindow.isNotifying
 
     function refreshWorkspaces() {
         var rawWorkspaces = Hyprland.workspaces.values;
         var safeWbs = [];
         var currentFocusedId = Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : -1;
+
         for (var i = 0; i < rawWorkspaces.length; i++) {
             var ws = rawWorkspaces[i];
             if (ws) {
                 var hasToplevels = (ws.toplevels && ws.toplevels.values.length > 0);
-                if (ws.id === currentFocusedId || hasToplevels)
+                if (ws.id === currentFocusedId || hasToplevels) {
                     safeWbs.push({
                         id: ws.id
                     });
+                }
             }
         }
         safeWbs.sort(function (a, b) {
@@ -181,14 +188,10 @@ PanelWindow {
 
     Connections {
         target: Hyprland
-        function onWorkspacesChanged() {
-            pillWindow.refreshWorkspaces();
-            pillWindow.checkWindowState();
-        }
         function onFocusedWorkspaceChanged() {
             pillWindow.refreshWorkspaces();
             pillWindow.checkWindowState();
-            pillWindow.viewState = 2;
+            pillWindow.viewState = pillWindow.viewWorkspaces;
             workspaceTimer.restart();
         }
         function onActiveToplevelChanged() {
@@ -197,20 +200,21 @@ PanelWindow {
     }
 
     Component.onCompleted: {
-        refreshWorkspaces();
+        pillWindow.refreshWorkspaces();
+        pillWindow.checkWindowState();
         getBri.running = true;
     }
 
     Timer {
         id: workspaceTimer
         interval: 2500
-        onTriggered: if (pillWindow.viewState === 2)
-            pillWindow.viewState = 0
+        onTriggered: if (pillWindow.viewState === pillWindow.viewWorkspaces)
+            pillWindow.viewState = pillWindow.viewTime
     }
 
     SystemClock {
         id: time
-        precision: SystemClock.Seconds
+        precision: SystemClock.Minutes
     }
 
     Timer {
@@ -241,8 +245,8 @@ PanelWindow {
     property string currentOsdIcon: "󰃠"
     property color currentOsdIconColor: Colors.orange
     property color currentOsdBarColor: Colors.green
-
     property bool osdReady: false
+
     Timer {
         interval: 1500
         running: true
@@ -253,8 +257,8 @@ PanelWindow {
         id: osdHideTimer
         interval: 2000
         onTriggered: {
-            if (pillWindow.viewState === 6)
-                pillWindow.viewState = 0;
+            if (pillWindow.viewState === pillWindow.viewOsd)
+                pillWindow.viewState = pillWindow.viewTime;
         }
     }
 
@@ -267,8 +271,8 @@ PanelWindow {
         pillWindow.currentOsdIconColor = iconColor;
         pillWindow.currentOsdBarColor = barColor;
 
-        if (pillWindow.viewState === 0 || pillWindow.viewState === 2 || pillWindow.viewState === 6) {
-            pillWindow.viewState = 6;
+        if (pillWindow.viewState === pillWindow.viewTime || pillWindow.viewState === pillWindow.viewWorkspaces || pillWindow.viewState === pillWindow.viewOsd) {
+            pillWindow.viewState = pillWindow.viewOsd;
             osdHideTimer.restart();
         }
     }
@@ -278,19 +282,19 @@ PanelWindow {
     }
 
     property var activeAudioNode: Pipewire.defaultAudioSink ? Pipewire.defaultAudioSink.audio : null
-    property real trackedVolume: activeAudioNode ? activeAudioNode.volume : 0
-    property bool trackedMute: activeAudioNode ? activeAudioNode.muted : false
+    property real trackedVolume: pillWindow.activeAudioNode ? pillWindow.activeAudioNode.volume : 0
+    property bool trackedMute: pillWindow.activeAudioNode ? pillWindow.activeAudioNode.muted : false
 
     onTrackedVolumeChanged: {
-        let icn = trackedMute ? "󰝟" : (trackedVolume > 0.5 ? "󰕾" : (trackedVolume > 0 ? "󰖀" : "󰕿"));
-        let clr = trackedMute ? Colors.red : Colors.blue;
-        triggerOsd(trackedVolume, icn, clr, Colors.blue);
+        let icn = pillWindow.trackedMute ? "󰝟" : (pillWindow.trackedVolume > 0.5 ? "󰕾" : (pillWindow.trackedVolume > 0 ? "󰖀" : "󰕿"));
+        let clr = pillWindow.trackedMute ? Colors.red : Colors.blue;
+        pillWindow.triggerOsd(pillWindow.trackedVolume, icn, clr, Colors.blue);
     }
 
     onTrackedMuteChanged: {
-        let icn = trackedMute ? "󰝟" : (trackedVolume > 0.5 ? "󰕾" : (trackedVolume > 0 ? "󰖀" : "󰕿"));
-        let clr = trackedMute ? Colors.red : Colors.blue;
-        triggerOsd(trackedVolume, icn, clr, Colors.blue);
+        let icn = pillWindow.trackedMute ? "󰝟" : (pillWindow.trackedVolume > 0.5 ? "󰕾" : (pillWindow.trackedVolume > 0 ? "󰖀" : "󰕿"));
+        let clr = pillWindow.trackedMute ? Colors.red : Colors.blue;
+        pillWindow.triggerOsd(pillWindow.trackedVolume, icn, clr, Colors.blue);
     }
 
     property real currentBriValue: 0.5
@@ -306,7 +310,7 @@ PanelWindow {
                     let newBri = parseInt(parts[3].replace("%", "")) / 100.0;
                     if (pillWindow.currentBriValue !== newBri) {
                         pillWindow.currentBriValue = newBri;
-                        triggerOsd(newBri, "󰃠", Colors.orange, Colors.green);
+                        pillWindow.triggerOsd(newBri, "󰃠", Colors.orange, Colors.green);
                     }
                 }
             }
@@ -331,37 +335,35 @@ PanelWindow {
                 if (pillWindow.currentNotification)
                     pillWindow.currentNotification.dismiss();
                 pillWindow.isNotifying = false;
-            } else if (pillWindow.viewState === 7) {
-                // THE FIX: Added 'currentView === 5' so Wallpapers goes back to Settings!
-                if (controlCenter.currentView === 4 || controlCenter.currentView === 5) {
-                    controlCenter.currentView = 3;
-                } else if (controlCenter.currentView !== 0) {
-                    controlCenter.currentView = 0;
+            } else if (pillWindow.viewState === pillWindow.viewControlCenter) {
+                if (pillWindow.cc.currentView === 4 || pillWindow.cc.currentView === 5) {
+                    pillWindow.cc.currentView = 3;
+                } else if (pillWindow.cc.currentView !== 0) {
+                    pillWindow.cc.currentView = 0;
                 } else {
-                    pillWindow.viewState = 1;
+                    pillWindow.viewState = pillWindow.viewExpanded;
                 }
-            } else if (pillWindow.viewState === 3) {
-                pillWindow.viewState = 1;
-            } else if (pillWindow.viewState === 1 || pillWindow.viewState === 4 || pillWindow.viewState === 5) {
-                pillWindow.viewState = 0;
+            } else if (pillWindow.viewState === pillWindow.viewMedia) {
+                pillWindow.viewState = pillWindow.viewExpanded;
+            } else if (pillWindow.viewState === pillWindow.viewExpanded || pillWindow.viewState === pillWindow.viewPowerMenu || pillWindow.viewState === pillWindow.viewLauncher) {
+                pillWindow.viewState = pillWindow.viewTime;
             }
         }
 
-        // These new shortcuts safely run alongside Escape without interfering:
         Keys.onLeftPressed: {
-            if (pillWindow.viewState === 4)
+            if (pillWindow.viewState === pillWindow.viewPowerMenu)
                 powerMenu.moveLeft();
         }
         Keys.onRightPressed: {
-            if (pillWindow.viewState === 4)
+            if (pillWindow.viewState === pillWindow.viewPowerMenu)
                 powerMenu.moveRight();
         }
         Keys.onReturnPressed: {
-            if (pillWindow.viewState === 4)
+            if (pillWindow.viewState === pillWindow.viewPowerMenu)
                 powerMenu.executeSelected();
         }
         Keys.onEnterPressed: {
-            if (pillWindow.viewState === 4)
+            if (pillWindow.viewState === pillWindow.viewPowerMenu)
                 powerMenu.executeSelected();
         }
 
@@ -373,39 +375,36 @@ PanelWindow {
             onExited: if (pillWindow.hasWindows)
                 hideTimer.restart()
             onClicked: {
-                // Keep focus locked to the pill even if you click dead space!
                 pill.forceActiveFocus();
-
-                // THE FIX: Added viewState 7 here so clicking dead space properly closes it!
-                if (pillWindow.viewState === 3 || pillWindow.viewState === 4 || pillWindow.viewState === 5 || pillWindow.viewState === 7)
-                    pillWindow.viewState = 1;
+                if (pillWindow.viewState === pillWindow.viewMedia || pillWindow.viewState === pillWindow.viewPowerMenu || pillWindow.viewState === pillWindow.viewLauncher || pillWindow.viewState === pillWindow.viewControlCenter)
+                    pillWindow.viewState = pillWindow.viewExpanded;
                 else
-                    viewState = (pillWindow.viewState === 2) ? 1 : ((pillWindow.viewState === 0) ? 1 : 0);
+                    pillWindow.viewState = (pillWindow.viewState === pillWindow.viewTime || pillWindow.viewState === pillWindow.viewWorkspaces) ? pillWindow.viewExpanded : pillWindow.viewTime;
             }
         }
 
         width: {
             if (pillWindow.isNotifying)
                 return Config.notifWidth;
-            if (pillWindow.viewState === 0)
+            if (pillWindow.viewState === pillWindow.viewTime)
                 return pillWindow.isMediaPlaying ? Config.timeWithEqWidth : Config.timeWidth;
-            if (pillWindow.viewState === 1)
+            if (pillWindow.viewState === pillWindow.viewExpanded)
                 return pillWindow.isMediaPlaying ? Config.expandedWidth : Config.timeWidth + sysPill.width + 48;
-            if (pillWindow.viewState === 2) {
+            if (pillWindow.viewState === pillWindow.viewWorkspaces) {
                 let count = pillWindow.activeWorkspaces.length;
                 if (count === 0)
                     return Config.timeWidth;
                 return Math.max((count * 24) + ((count - 1) * 8) + 40, Config.timeWidth);
             }
-            if (pillWindow.viewState === 3)
+            if (pillWindow.viewState === pillWindow.viewMedia)
                 return Config.mediaCtrlWidth;
-            if (pillWindow.viewState === 4)
+            if (pillWindow.viewState === pillWindow.viewPowerMenu)
                 return Config.powerMenuWidth;
-            if (pillWindow.viewState === 5)
+            if (pillWindow.viewState === pillWindow.viewLauncher)
                 return Config.launcherWidth;
-            if (pillWindow.viewState === 6)
+            if (pillWindow.viewState === pillWindow.viewOsd)
                 return Config.osdWidth;
-            if (pillWindow.viewState === 7)
+            if (pillWindow.viewState === pillWindow.viewControlCenter)
                 return Config.ccWidth;
             return Config.timeWidth;
         }
@@ -413,17 +412,17 @@ PanelWindow {
         height: {
             if (pillWindow.isNotifying)
                 return notifView.dynamicHeight;
-            if (pillWindow.viewState === 1)
+            if (pillWindow.viewState === pillWindow.viewExpanded)
                 return Config.expandedHeight;
-            if (pillWindow.viewState === 3)
+            if (pillWindow.viewState === pillWindow.viewMedia)
                 return Config.mediaCtrlHeight;
-            if (pillWindow.viewState === 4)
+            if (pillWindow.viewState === pillWindow.viewPowerMenu)
                 return Config.powerMenuHeight;
-            if (pillWindow.viewState === 5)
+            if (pillWindow.viewState === pillWindow.viewLauncher)
                 return appLauncher.dynamicHeight;
-            if (pillWindow.viewState === 6)
+            if (pillWindow.viewState === pillWindow.viewOsd)
                 return Config.osdHeight;
-            if (pillWindow.viewState === 7)
+            if (pillWindow.viewState === pillWindow.viewControlCenter)
                 return Config.ccHeight;
             return Config.pillHeight;
         }
@@ -431,17 +430,17 @@ PanelWindow {
         radius: {
             if (pillWindow.isNotifying)
                 return Config.notifRadius;
-            if (pillWindow.viewState === 3)
+            if (pillWindow.viewState === pillWindow.viewMedia)
                 return Config.mediaCtrlRadius;
-            if (pillWindow.viewState === 4)
+            if (pillWindow.viewState === pillWindow.viewPowerMenu)
                 return Config.powerMenuHeight / 2;
-            if (pillWindow.viewState === 5)
+            if (pillWindow.viewState === pillWindow.viewLauncher)
                 return Config.launcherRadius;
-            if (pillWindow.viewState === 6)
+            if (pillWindow.viewState === pillWindow.viewOsd)
                 return Config.osdRadius;
-            if (pillWindow.viewState === 7)
+            if (pillWindow.viewState === pillWindow.viewControlCenter)
                 return Config.ccRadius;
-            return height / 2;
+            return pill.height / 2;
         }
 
         Behavior on width {
@@ -450,18 +449,21 @@ PanelWindow {
                 easing.type: Config.animEasing
             }
         }
+
         Behavior on height {
             NumberAnimation {
                 duration: Config.animDuration
                 easing.type: Config.animEasing
             }
         }
+
         Behavior on y {
             NumberAnimation {
                 duration: Config.animDuration
                 easing.type: Config.animEasing
             }
         }
+
         Behavior on radius {
             NumberAnimation {
                 duration: Config.animDuration
@@ -470,11 +472,13 @@ PanelWindow {
         }
 
         // === CONTENT VIEWS ===
+
         Row {
             anchors.centerIn: parent
             spacing: 12
-            opacity: (pillWindow.viewState === 0 && !pillWindow.isNotifying) ? 1 : 0
+            opacity: (pillWindow.viewState === pillWindow.viewTime && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
+
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
@@ -486,6 +490,7 @@ PanelWindow {
                 isPlaying: pillWindow.isMediaPlaying
                 visible: pillWindow.isMediaPlaying
             }
+
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 color: Colors.fg0
@@ -500,8 +505,9 @@ PanelWindow {
             anchors.fill: parent
             anchors.leftMargin: 24
             anchors.rightMargin: 16
-            opacity: (pillWindow.viewState === 1 && !pillWindow.isNotifying) ? 1 : 0
+            opacity: (pillWindow.viewState === pillWindow.viewExpanded && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
+
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
@@ -531,7 +537,7 @@ PanelWindow {
                         color: Colors.fg2
                         font.family: Config.fontName
                         font.pixelSize: Config.fontSizeMediaTitle
-                        text: (Mpris.players.values.length > 0 && Mpris.players.values[0].metadata) ? (Mpris.players.values[0].metadata["xesam:title"] || "") : ""
+                        text: (pillWindow.activePlayer && pillWindow.activePlayer.metadata) ? (pillWindow.activePlayer.metadata["xesam:title"] || "") : ""
                         width: Math.min(implicitWidth, (pill.width / 2) - timeDateCol.width / 2 - eqIcon.width - 40)
                         elide: Text.ElideRight
                     }
@@ -540,7 +546,7 @@ PanelWindow {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: pillWindow.viewState = 3
+                    onClicked: pillWindow.viewState = pillWindow.viewMedia
                 }
             }
 
@@ -558,6 +564,7 @@ PanelWindow {
                     font.bold: true
                     text: Qt.formatTime(time.date, "h:mm AP")
                 }
+
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     color: Colors.aqua
@@ -568,7 +575,6 @@ PanelWindow {
                 }
             }
 
-            // --- WRAPPED SYSTEM PILL ---
             MouseArea {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
@@ -577,7 +583,7 @@ PanelWindow {
                 height: sysPill.height
                 cursorShape: Qt.PointingHandCursor
 
-                onClicked: pillWindow.viewState = 7
+                onClicked: pillWindow.viewState = pillWindow.viewControlCenter
 
                 SystemPill {
                     id: sysPill
@@ -590,8 +596,9 @@ PanelWindow {
             id: workspaceRow
             anchors.centerIn: parent
             spacing: 8
-            opacity: (pillWindow.viewState === 2 && !pillWindow.isNotifying) ? 1 : 0
+            opacity: (pillWindow.viewState === pillWindow.viewWorkspaces && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
+
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
@@ -600,18 +607,22 @@ PanelWindow {
 
             Repeater {
                 model: pillWindow.activeWorkspaces
+
                 Rectangle {
+                    id: workspaceRect
+                    required property var modelData
                     width: 24
                     height: 24
                     radius: 12
-                    property bool isFocused: modelData.id === Hyprland.focusedWorkspace?.id
-                    color: isFocused ? Colors.aqua : "transparent"
-                    border.color: isFocused ? Colors.aqua : Colors.fg3
+                    property bool isFocused: workspaceRect.modelData.id === (Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : -1)
+                    color: workspaceRect.isFocused ? Colors.aqua : "transparent"
+                    border.color: workspaceRect.isFocused ? Colors.aqua : Colors.fg3
                     border.width: 2
+
                     Text {
                         anchors.centerIn: parent
-                        text: modelData.id
-                        color: isFocused ? Colors.bg0 : Colors.fg0
+                        text: workspaceRect.modelData.id
+                        color: workspaceRect.isFocused ? Colors.bg0 : Colors.fg0
                         font.family: Config.fontName
                         font.pixelSize: Config.fontSizeWorkspace
                         font.bold: true
@@ -620,30 +631,33 @@ PanelWindow {
             }
         }
 
+        // --- RESTORED PERSISTENT VIEWS ---
         MediaController {
             id: mediaCtrl
             anchors.fill: parent
-            opacity: (pillWindow.viewState === 3 && !pillWindow.isNotifying) ? 1 : 0
+            opacity: (pillWindow.viewState === pillWindow.viewMedia && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
+
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
                 }
             }
-            onCloseRequested: pillWindow.viewState = 1
+            onCloseRequested: pillWindow.viewState = pillWindow.viewExpanded
         }
 
         PowerMenu {
             id: powerMenu
             anchors.fill: parent
-            opacity: (pillWindow.viewState === 4 && !pillWindow.isNotifying) ? 1 : 0
+            opacity: (pillWindow.viewState === pillWindow.viewPowerMenu && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
+
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
                 }
             }
-            onCloseRequested: pillWindow.viewState = 0
+            onCloseRequested: pillWindow.viewState = pillWindow.viewTime
         }
 
         AppLauncher {
@@ -652,21 +666,23 @@ PanelWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             width: Config.launcherWidth
             height: parent.height
-            opacity: (pillWindow.viewState === 5 && !pillWindow.isNotifying) ? 1 : 0
+            opacity: (pillWindow.viewState === pillWindow.viewLauncher && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
+
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
                 }
             }
-            onCloseRequested: pillWindow.viewState = 0
+            onCloseRequested: pillWindow.viewState = pillWindow.viewTime
         }
 
         Osd {
             id: osdView
             anchors.fill: parent
-            opacity: (pillWindow.viewState === 6 && !pillWindow.isNotifying) ? 1 : 0
+            opacity: (pillWindow.viewState === pillWindow.viewOsd && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
+
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
@@ -686,6 +702,7 @@ PanelWindow {
 
             opacity: pillWindow.isNotifying ? 1 : 0
             visible: opacity > 0
+
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
@@ -698,15 +715,16 @@ PanelWindow {
         ControlCenter {
             id: controlCenter
             anchors.fill: parent
-            opacity: (pillWindow.viewState === 7 && !pillWindow.isNotifying) ? 1 : 0
+            opacity: (pillWindow.viewState === pillWindow.viewControlCenter && !pillWindow.isNotifying) ? 1 : 0
             visible: opacity > 0
+
             Behavior on opacity {
                 NumberAnimation {
                     duration: 200
                 }
             }
 
-            onCloseRequested: pillWindow.viewState = 1
+            onCloseRequested: pillWindow.viewState = pillWindow.viewExpanded
         }
     }
 

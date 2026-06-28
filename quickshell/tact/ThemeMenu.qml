@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -7,11 +8,12 @@ Item {
     signal backRequested
 
     property string activeTheme: ""
+    property var themeData: []
+    property string pendingTheme: ""
 
     // ==========================================
     // 1. AUTOMATIC EXTERNAL APP ENGINE
     // ==========================================
-
     Timer {
         id: applyTimer
         interval: 1000
@@ -23,7 +25,6 @@ Item {
     }
 
     function applyGtk() {
-        // THE FIX: Added all specific sidebar, secondary_sidebar, and notification colors!
         let css = `
 @define-color accent_color ${Colors.blue};
 @define-color accent_bg_color ${Colors.blue};
@@ -86,23 +87,19 @@ Item {
         "element.hover": "${Colors.bg2}",
         "element.active": "${Colors.bg3}",
         "element.selected": "${Colors.bg2}",
-
         "title_bar.background": "${Colors.bg0}",
         "title_bar.inactive_background": "${Colors.bg0}",
-
         "status_bar.background": "${Colors.bg0}",
         "tab_bar.background": "${Colors.bg1}",
         "tab.inactive_background": "${Colors.bg1}",
         "tab.active_background": "${Colors.bg0}",
         "panel.background": "${Colors.bg0}",
-
         "toolbar.background": "${Colors.bg0}",
         "surface.background": "${Colors.bg0}",
         "elevated_surface.background": "${Colors.bg1}",
         "scrollbar.thumb.background": "${Colors.bg2}80",
         "scrollbar.thumb.hover_background": "${Colors.bg3}",
         "scrollbar.track.background": "${Colors.bg0}00",
-
         "editor.background": "${Colors.bg0}",
         "editor.foreground": "${Colors.fg}",
         "editor.line_number": "${Colors.grey0}",
@@ -143,9 +140,7 @@ Item {
           "comment": { "color": "${Colors.grey1}", "font_style": "italic" },
           "variable": { "color": "${Colors.fg}" },
           "constant": { "color": "${Colors.orange}" },
-
           "punctuation": { "color": "${Colors.fg2}" },
-
           "operator": { "color": "${Colors.aqua}" },
           "tag": { "color": "${Colors.red}" }
         }
@@ -162,7 +157,7 @@ Item {
     }
 
     // ==========================================
-    // 2. THEME DATA ENGINE
+    // 2. THEME DATA ENGINE (One-Time Startup Fetch)
     // ==========================================
     Process {
         id: getActiveProc
@@ -175,40 +170,41 @@ Item {
         }
     }
 
-    property var themeData: []
-    property string themeBuffer: ""
-
     Process {
         id: scanThemesProc
-        command: ["bash", "-c", "for d in ~/.config/color-scheme/*/; do " + "name=$(basename \"$d\"); " + "bg=$(grep 'readonly property color bg2' \"$d/quickshell/Colors.qml\" | cut -d'\"' -f2); " + "acc=$(grep 'readonly property color aqua' \"$d/quickshell/Colors.qml\" | cut -d'\"' -f2); " + "echo \"$name|$bg|$acc\"; " + "done"]
+        command: ["bash", "-c", "for d in ~/.config/color-scheme/*/; do name=$(basename \"$d\"); bg=$(grep 'readonly property color bg2' \"$d/quickshell/Colors.qml\" 2>/dev/null | cut -d'\"' -f2); acc=$(grep 'readonly property color aqua' \"$d/quickshell/Colors.qml\" 2>/dev/null | cut -d'\"' -f2); echo \"$name|${bg:-#152a26}|${acc:-#3dd1b0}\"; done"]
         running: true
+
+        property string themeBuffer: ""
+
         stdout: SplitParser {
             onRead: data => {
-                themeBuffer += data + "\n";
+                scanThemesProc.themeBuffer += data + "\n";
             }
         }
+
+        // qmllint disable signal-handler-parameters
         onExited: {
-            let lines = themeBuffer.split("\n");
+            let lines = scanThemesProc.themeBuffer.split("\n");
             let tempArr = [];
             for (let i = 0; i < lines.length; i++) {
                 let line = lines[i].trim();
                 if (!line)
                     continue;
+
                 let parts = line.split("|");
                 if (parts.length === 3) {
                     tempArr.push({
                         name: parts[0],
-                        bgHex: parts[1] ? parts[1] : "#152a26",
-                        accHex: parts[2] ? parts[2] : "#3dd1b0"
+                        bgHex: parts[1],
+                        accHex: parts[2]
                     });
                 }
             }
             themeRoot.themeData = tempArr;
-            themeBuffer = "";
+            scanThemesProc.themeBuffer = ""; // Clear memory
         }
     }
-
-    property string pendingTheme: ""
 
     // ==========================================
     // 3. UI LAYOUT
@@ -285,6 +281,10 @@ Item {
                     model: themeRoot.themeData
 
                     Rectangle {
+                        id: delegateRect
+                        required property int index
+                        required property var modelData
+
                         width: (parent.width - 24) / 3
                         height: 72
                         radius: 12
@@ -323,15 +323,15 @@ Item {
                                 text: "󰑐"
                                 font.family: Config.fontName
                                 font.pixelSize: 18
-                                color: modelData.accHex
-                                visible: isApplying
+                                color: delegateRect.modelData.accHex
+                                visible: delegateRect.isApplying
 
                                 RotationAnimation on rotation {
                                     loops: Animation.Infinite
                                     from: 0
                                     to: 360
                                     duration: 1000
-                                    running: isApplying
+                                    running: delegateRect.isApplying
                                 }
                             }
 
@@ -339,19 +339,19 @@ Item {
                                 width: 28
                                 height: 6
                                 radius: 3
-                                color: modelData.accHex
+                                color: delegateRect.modelData.accHex
                                 anchors.horizontalCenter: parent.horizontalCenter
-                                visible: !isApplying
+                                visible: !delegateRect.isApplying
                             }
 
                             Text {
-                                text: modelData.name
-                                color: isSelected ? modelData.accHex : Colors.fg1
+                                text: delegateRect.modelData.name
+                                color: delegateRect.isSelected ? delegateRect.modelData.accHex : Colors.fg1
                                 font.family: Config.fontName
                                 font.pixelSize: 13
-                                font.bold: isSelected
+                                font.bold: delegateRect.isSelected
                                 anchors.horizontalCenter: parent.horizontalCenter
-                                visible: !isApplying
+                                visible: !delegateRect.isApplying
                             }
                         }
 
@@ -361,11 +361,11 @@ Item {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                if (themeRoot.activeTheme === modelData.name || themeRoot.pendingTheme !== "")
+                                if (themeRoot.activeTheme === delegateRect.modelData.name || themeRoot.pendingTheme !== "")
                                     return;
 
-                                themeRoot.pendingTheme = modelData.name;
-                                Quickshell.execDetached(["bash", "-c", "bash $HOME/.config/quickshell/scripts/theme.sh " + modelData.name]);
+                                themeRoot.pendingTheme = delegateRect.modelData.name;
+                                Quickshell.execDetached(["bash", "-c", "bash $HOME/.config/quickshell/scripts/theme.sh " + delegateRect.modelData.name]);
                             }
                         }
                     }

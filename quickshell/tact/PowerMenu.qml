@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Qt5Compat.GraphicalEffects
@@ -10,13 +11,11 @@ Item {
     property int selectedIndex: -1
     property int activatedIndex: -1
     property real timeRemaining: 10.0
-
-    // --- THE GLITCH FIX: Delayed Execution ---
     property var pendingCommand: []
 
     Timer {
         id: executeDelayTimer
-        interval: 400 // Gives the pill exactly enough time to finish its closing animation!
+        interval: 400
         onTriggered: {
             if (powerMenuRoot.pendingCommand.length > 0) {
                 Quickshell.execDetached(powerMenuRoot.pendingCommand);
@@ -33,12 +32,10 @@ Item {
         to: 0.0
         duration: 10000
         onFinished: {
-            if (powerMenuRoot.activatedIndex !== -1 && powerMenuRoot.timeRemaining === 0) {
+            if (powerMenuRoot.activatedIndex !== -1 && powerMenuRoot.timeRemaining <= 0.05) {
                 let cmd = powerMenuRoot.menuItems[powerMenuRoot.activatedIndex].cmd;
                 powerMenuRoot.cancelCountdown();
                 powerMenuRoot.closeRequested();
-
-                // Triggers the execution delay
                 powerMenuRoot.pendingCommand = cmd;
                 executeDelayTimer.restart();
             }
@@ -118,9 +115,7 @@ Item {
         if (activatedIndex === selectedIndex) {
             let cmd = menuItems[activatedIndex].cmd;
             cancelCountdown();
-            closeRequested(); // Closes the widget
-
-            // Triggers the execution delay so the widget can vanish before locking
+            closeRequested();
             powerMenuRoot.pendingCommand = cmd;
             executeDelayTimer.restart();
         } else {
@@ -141,6 +136,11 @@ Item {
             model: powerMenuRoot.menuItems
 
             Rectangle {
+                id: delegateRect
+
+                required property int index
+                required property var modelData
+
                 width: Config.powerMenuBoxSize
                 height: Config.powerMenuBoxSize
                 radius: Config.powerMenuBoxRadius
@@ -165,15 +165,14 @@ Item {
 
                 Item {
                     anchors.fill: parent
-                    visible: isActivated
+                    visible: delegateRect.isActivated
 
                     Rectangle {
                         id: animatedBorder
                         anchors.fill: parent
                         color: "transparent"
-                        border.color: modelData.color
+                        border.color: delegateRect.modelData.color
                         visible: false
-
                         radius: Config.powerMenuBoxRadius
                         border.width: Config.powerMenuBorderWidth
                     }
@@ -212,11 +211,11 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: isActivated ? Math.ceil(powerMenuRoot.timeRemaining).toString() : modelData.icon
-                    color: (isSelected && !isActivated) ? Colors.bg0 : (isActivated ? modelData.color : Colors.fg0)
+                    text: delegateRect.isActivated ? Math.ceil(powerMenuRoot.timeRemaining).toString() : delegateRect.modelData.icon
+                    color: (delegateRect.isSelected && !delegateRect.isActivated) ? Colors.bg0 : (delegateRect.isActivated ? delegateRect.modelData.color : Colors.fg0)
                     font.family: Config.fontName
-                    font.bold: isActivated
-                    font.pixelSize: isActivated ? Config.powerMenuCountdownSize : Config.powerMenuIconSize
+                    font.bold: delegateRect.isActivated
+                    font.pixelSize: delegateRect.isActivated ? Config.powerMenuCountdownSize : Config.powerMenuIconSize
 
                     Behavior on color {
                         ColorAnimation {
@@ -232,14 +231,14 @@ Item {
                     cursorShape: Qt.PointingHandCursor
 
                     onEntered: {
-                        if (powerMenuRoot.selectedIndex !== index) {
+                        if (powerMenuRoot.selectedIndex !== delegateRect.index) {
                             powerMenuRoot.cancelCountdown();
-                            powerMenuRoot.selectedIndex = index;
+                            powerMenuRoot.selectedIndex = delegateRect.index;
                         }
                     }
 
                     onClicked: {
-                        powerMenuRoot.selectedIndex = index;
+                        powerMenuRoot.selectedIndex = delegateRect.index;
                         powerMenuRoot.executeSelected();
                     }
                 }

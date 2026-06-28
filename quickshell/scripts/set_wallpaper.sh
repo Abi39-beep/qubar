@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 1. THE FIX: Explicitly set the PATH so Quickshell can find 'awww'!
+# 1. Explicitly set the PATH so Quickshell can find 'awww'!
 export PATH=$PATH:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
 
 wall_path="$1"

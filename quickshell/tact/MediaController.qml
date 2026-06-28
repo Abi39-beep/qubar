@@ -5,7 +5,6 @@ import Qt5Compat.GraphicalEffects
 
 Item {
     id: mediaCtrl
-
     signal closeRequested
 
     focus: true
@@ -19,9 +18,6 @@ Item {
         onClicked: mediaCtrl.closeRequested()
     }
 
-    // ==========================================
-    // 1. NATIVE STATE ENGINE & CLOCK
-    // ==========================================
     property var activePlayer: null
     readonly property bool hasPlayer: mediaCtrl.activePlayer !== null
     readonly property bool isPlaying: mediaCtrl.hasPlayer && mediaCtrl.activePlayer.playbackState === MprisPlaybackState.Playing
@@ -39,7 +35,6 @@ Item {
     readonly property real lengthSec: mediaCtrl.hasPlayer && mediaCtrl.activePlayer.metadata && mediaCtrl.activePlayer.metadata["mpris:length"] ? mediaCtrl.activePlayer.metadata["mpris:length"] / 1000000 : 0
     property real positionSec: 0
 
-    // THE NATIVE CLOCK ENGINE
     Timer {
         interval: 500
         running: true
@@ -72,9 +67,7 @@ Item {
         return mins + ":" + (secs < 10 ? "0" : "") + secs;
     }
 
-    // ==========================================
-    // 2. UI LAYOUT
-    // ==========================================
+    // UI LAYOUT
 
     property Item maskItem: imageMask
 
@@ -111,17 +104,18 @@ Item {
         anchors.fill: parent
         anchors.margins: 18
 
-        // --- TOP SECTION (Info & Buttons) ---
-        Row {
+        Item {
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
             height: 50
 
             Column {
+                anchors.left: parent.left
                 width: parent.width - 130
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 4
+
                 Text {
                     text: mediaCtrl.title
                     font.bold: true
@@ -131,6 +125,7 @@ Item {
                     elide: Text.ElideRight
                     width: parent.width
                 }
+
                 Text {
                     text: mediaCtrl.artist
                     color: Colors.fg2
@@ -153,12 +148,14 @@ Item {
                     font.pixelSize: 22
                     color: prevArea.containsMouse ? Colors.aqua : Colors.fg0
                     anchors.verticalCenter: parent.verticalCenter
+
                     MouseArea {
                         id: prevArea
                         anchors.fill: parent
                         anchors.margins: -10
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
+
                         onClicked: {
                             if (mediaCtrl.hasPlayer)
                                 mediaCtrl.activePlayer.previous();
@@ -173,6 +170,7 @@ Item {
                     radius: 22
                     color: playArea.containsMouse ? Colors.blue : Colors.aqua
                     anchors.verticalCenter: parent.verticalCenter
+
                     Text {
                         text: mediaCtrl.isPlaying ? "󰏤" : "󰐊"
                         font.family: Config.fontName
@@ -181,6 +179,7 @@ Item {
                         anchors.centerIn: parent
                         anchors.horizontalCenterOffset: mediaCtrl.isPlaying ? 0 : 2
                     }
+
                     MouseArea {
                         id: playArea
                         anchors.fill: parent
@@ -200,12 +199,14 @@ Item {
                     font.pixelSize: 22
                     color: nextArea.containsMouse ? Colors.aqua : Colors.fg0
                     anchors.verticalCenter: parent.verticalCenter
+
                     MouseArea {
                         id: nextArea
                         anchors.fill: parent
                         anchors.margins: -10
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
+
                         onClicked: {
                             if (mediaCtrl.hasPlayer)
                                 mediaCtrl.activePlayer.next();

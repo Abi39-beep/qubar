@@ -55,14 +55,14 @@ QtObject {
     readonly property int batteryWidth: 34
     readonly property int batteryHeight: 17
     readonly property int batteryRadius: 4
-    readonly property int batteryBorderWidth: 2
+    readonly property int batteryBorderWidth: 1
 
     // Battery Inner Fill
     readonly property int batteryFillGap: 1    // The empty space between the border and the green fill
     readonly property int batteryFillRadius: 2
 
     // Battery Tip
-    readonly property int batteryTipWidth: 2
+    readonly property int batteryTipWidth: 1
     readonly property int batteryTipHeight: 6
     readonly property int batteryTipRadius: 1
     readonly property int batteryTipSpacing: 2 // The gap between the main body and the tip

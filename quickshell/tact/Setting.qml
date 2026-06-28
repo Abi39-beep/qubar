@@ -1,11 +1,10 @@
 import QtQuick
-import Quickshell
 
 Item {
     id: settingRoot
     signal backRequested
     signal openThemeRequested
-    signal openWallpaperRequested // NEW SIGNAL!
+    signal openWallpaperRequested
 
     Column {
         anchors.fill: parent
@@ -72,7 +71,7 @@ Item {
             color: themeBtnArea.containsMouse || activeFocus ? Colors.bg2 : Colors.bg1
             border.color: themeBtnArea.containsMouse || activeFocus ? Colors.bg3 : Colors.bg2
             border.width: 1
-            focus: true // Allows keyboard navigation
+            focus: true
 
             Behavior on color {
                 ColorAnimation {
@@ -87,7 +86,7 @@ Item {
                 spacing: 16
 
                 Text {
-                    text: "󰸉" // Paint palette
+                    text: "󰸉"
                     color: Colors.aqua
                     font.family: Config.fontName
                     font.pixelSize: 18
@@ -131,7 +130,7 @@ Item {
             color: wallBtnArea.containsMouse || activeFocus ? Colors.bg2 : Colors.bg1
             border.color: wallBtnArea.containsMouse || activeFocus ? Colors.bg3 : Colors.bg2
             border.width: 1
-            focus: true // Allows keyboard navigation
+            focus: true
 
             Behavior on color {
                 ColorAnimation {
@@ -146,7 +145,7 @@ Item {
                 spacing: 16
 
                 Text {
-                    text: "󰋩" // Image icon
+                    text: "󰋩"
                     color: Colors.blue
                     font.family: Config.fontName
                     font.pixelSize: 18
