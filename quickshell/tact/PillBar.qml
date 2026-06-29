@@ -301,8 +301,9 @@ PanelWindow {
 
     Process {
         id: getBri
-        command: ["bash", "-c", "while true; do brightnessctl -m; inotifywait -qq -e modify /sys/class/backlight/*/brightness; done"]
+        command: ["brightnessctl", "-m"]
         running: false
+
         stdout: SplitParser {
             onRead: data => {
                 let parts = data.split(",");
@@ -313,6 +314,20 @@ PanelWindow {
                         pillWindow.triggerOsd(newBri, "󰃠", Colors.orange, Colors.green);
                     }
                 }
+            }
+        }
+
+        // qmllint disable signal-handler-parameters
+        onExited: getBri.running = false
+    }
+
+    Timer {
+        interval: 200
+        running: true
+        repeat: true
+        onTriggered: {
+            if (!getBri.running) {
+                getBri.running = true;
             }
         }
     }
