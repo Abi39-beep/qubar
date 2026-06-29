@@ -3,12 +3,13 @@ import QtQuick.Controls.Basic
 import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
+import Quickshell.Wayland
 
 PanelWindow {
     id: launcherRoot
-    signal closeRequested
 
     // --- WAYLAND SETUP ---
+    WlrLayershell.namespace: "app_launcher"
     screen: Quickshell.primaryScreen
     focusable: true
     anchors {
@@ -34,24 +35,65 @@ PanelWindow {
     property string fontName: "SF Mono Propo"
     property string terminalEmulator: "kitty"
 
-    // --- MODE SWITCHER & DATA ---
+    // --- STATE DATA ---
     property bool isClipboardMode: false
     property var allClips: []
     property string clipBuffer: ""
+    property var pendingApp: null
+    property string pendingCommand: ""
 
-    // --- SMART HEIGHT MATH ---
-    property int dynamicHeight: {
-        if (!clipList || !appList)
-            return 300;
-        let activeList = isClipboardMode ? clipList : appList;
-        let count = activeList ? activeList.count : 0;
-        let visibleItems = Math.min(count, launcherMaxItems);
-        let listHeight = visibleItems > 0 ? (visibleItems * (appItemHeight + 6)) - 6 : 0;
-        let baseHeight = searchBarHeight + 56;
-        return listHeight > 0 ? (baseHeight + listHeight) : baseHeight;
+    // ==========================================
+    // 1. GLOBAL ACTION FUNCTIONS
+    // ==========================================
+    function launchApp(appModel) {
+        let needsTerm = appModel.terminal || appModel.runInTerminal || false;
+
+        if (needsTerm) {
+            let cmd = appModel.executable || appModel.name.toLowerCase();
+            launcherRoot.pendingCommand = launcherRoot.terminalEmulator + " -e " + cmd;
+        } else {
+            launcherRoot.pendingApp = appModel;
+        }
+
+        launcherRoot.visible = false;
+        execTimer.restart();
     }
 
-    // --- BACKGROUND PROCESSES & TIMERS ---
+    function copyClip(clipModel) {
+        let safeLine = clipModel.rawLine.replace(/'/g, "'\\''");
+        Quickshell.execDetached(["bash", "-c", "echo -E '" + safeLine + "' | cliphist decode | wl-copy"]);
+        launcherRoot.visible = false;
+    }
+
+    function clearClipboard() {
+        Quickshell.execDetached(["cliphist", "wipe"]);
+        launcherRoot.allClips = [];
+        searchInput.forceActiveFocus();
+    }
+
+    // ==========================================
+    // 2. BACKGROUND PROCESSES & TIMERS
+    // ==========================================
+    Timer {
+        id: execTimer
+        interval: 350
+        onTriggered: {
+            if (launcherRoot.pendingApp) {
+                launcherRoot.pendingApp.execute();
+                launcherRoot.pendingApp = null;
+            } else if (launcherRoot.pendingCommand !== "") {
+                Quickshell.execDetached(["bash", "-c", launcherRoot.pendingCommand]);
+                launcherRoot.pendingCommand = "";
+            }
+        }
+    }
+
+    Timer {
+        id: focusStealTimer
+        interval: 150
+        onTriggered: searchInput.forceActiveFocus()
+    }
+
     // qmllint disable signal-handler-parameters
     Process {
         id: clipProc
@@ -84,12 +126,6 @@ PanelWindow {
         }
     }
 
-    Timer {
-        id: focusStealTimer
-        interval: 150
-        onTriggered: searchInput.forceActiveFocus()
-    }
-
     onVisibleChanged: {
         if (visible) {
             launcherRoot.isClipboardMode = false;
@@ -98,6 +134,7 @@ PanelWindow {
             appList.currentIndex = 0;
             clipList.contentY = 0;
             clipList.currentIndex = 0;
+
             launcherRoot.clipBuffer = "";
             clipProc.running = false;
             clipProc.running = true;
@@ -107,7 +144,21 @@ PanelWindow {
         }
     }
 
-    // --- WRAPPER ITEM ---
+    // --- SMART HEIGHT MATH ---
+    property int dynamicHeight: {
+        if (!clipList || !appList)
+            return 300;
+        let activeList = launcherRoot.isClipboardMode ? clipList : appList;
+        let count = activeList ? activeList.count : 0;
+        let visibleItems = Math.min(count, launcherMaxItems);
+        let listHeight = visibleItems > 0 ? (visibleItems * (appItemHeight + 6)) - 6 : 0;
+        let baseHeight = searchBarHeight + 56;
+        return listHeight > 0 ? (baseHeight + listHeight) : baseHeight;
+    }
+
+    // ==========================================
+    // 3. UI & LAYOUT
+    // ==========================================
     Item {
         anchors.fill: parent
 
@@ -116,7 +167,6 @@ PanelWindow {
             onClicked: launcherRoot.visible = false
         }
 
-        // --- THE VISUAL BOX ---
         Rectangle {
             anchors.centerIn: parent
             width: 450
@@ -126,6 +176,23 @@ PanelWindow {
             border.color: Colors.bg2
             border.width: 2
             clip: true
+
+            transformOrigin: Item.Center
+            scale: launcherRoot.visible ? 1.0 : 0.75
+            opacity: launcherRoot.visible ? 1.0 : 0.0
+
+            Behavior on scale {
+                NumberAnimation {
+                    duration: 350
+                    easing.type: Easing.OutBack
+                }
+            }
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 200
+                }
+            }
 
             Behavior on height {
                 NumberAnimation {
@@ -154,7 +221,6 @@ PanelWindow {
                     border.width: 2
 
                     property bool showClear: launcherRoot.isClipboardMode && launcherRoot.allClips.length > 0
-
                     Behavior on border.color {
                         ColorAnimation {
                             duration: 150
@@ -188,7 +254,6 @@ PanelWindow {
                             font.family: launcherRoot.fontName
                             font.pixelSize: launcherRoot.fontSizeSearchInput
                             background: null
-
                             placeholderText: launcherRoot.isClipboardMode ? "Search clipboard... (Tab to switch)" : "Search apps... (Tab to switch)"
                             placeholderTextColor: Colors.bg4
 
@@ -218,18 +283,24 @@ PanelWindow {
                             }
 
                             onAccepted: {
-                                let activeList = launcherRoot.isClipboardMode ? clipList : appList;
-                                if (activeList.count > 0 && activeList.currentIndex >= 0) {
-                                    activeList.currentItem.trigger();
-                                } else if (!launcherRoot.isClipboardMode && text.trim() !== "") {
-                                    Quickshell.execDetached(["bash", "-c", text.trim()]);
-                                    launcherRoot.visible = false;
+                                if (launcherRoot.isClipboardMode) {
+                                    if (clipList.count > 0 && clipList.currentIndex >= 0) {
+                                        launcherRoot.copyClip(clipList.model.values[clipList.currentIndex]);
+                                    }
+                                } else {
+                                    if (appList.count > 0 && appList.currentIndex >= 0) {
+                                        launcherRoot.launchApp(appList.model.values[appList.currentIndex]);
+                                    } else if (text.trim() !== "") {
+                                        launcherRoot.pendingCommand = text.trim();
+                                        launcherRoot.visible = false;
+                                        execTimer.restart();
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // --- THE INTEGRATED CLEAR ALL ICON ---
+                    // Integrated Clear All Icon
                     Rectangle {
                         anchors.right: parent.right
                         anchors.rightMargin: 6
@@ -242,7 +313,7 @@ PanelWindow {
 
                         Text {
                             anchors.centerIn: parent
-                            text: "󰃢" // Broom Icon
+                            text: "󰃢"
                             color: clearArea.containsMouse ? Colors.red : Colors.fg2
                             font.family: launcherRoot.fontName
                             font.pixelSize: 16
@@ -258,11 +329,7 @@ PanelWindow {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             hoverEnabled: true
-                            onClicked: {
-                                Quickshell.execDetached(["cliphist", "wipe"]);
-                                launcherRoot.allClips = [];
-                                searchInput.forceActiveFocus();
-                            }
+                            onClicked: launcherRoot.clearClipboard()
                         }
                     }
                 }
@@ -282,7 +349,6 @@ PanelWindow {
                         objectProp: "id"
                         values: {
                             let search = String(searchInput.text).toLowerCase().trim();
-
                             let allApps = [...DesktopEntries.applications.values];
 
                             if (search === "")
@@ -291,13 +357,27 @@ PanelWindow {
                             return allApps.filter(app => {
                                 let appName = String(app.name || "").toLowerCase();
                                 let execName = String(app.executable || "").toLowerCase();
-                                return appName.includes(search) || execName.includes(search);
+                                let genName = String(app.genericName || "").toLowerCase();
+
+                                if (appName.includes(search) || execName.includes(search) || genName.includes(search))
+                                    return true;
+
+                                if (app.keywords) {
+                                    for (let i = 0; i < app.keywords.length; i++) {
+                                        if (String(app.keywords[i]).toLowerCase().includes(search))
+                                            return true;
+                                    }
+                                }
+                                return false;
                             });
                         }
                     }
 
                     delegate: Rectangle {
                         id: delegateRect
+                        required property var modelData
+                        required property int index
+
                         width: ListView.view.width
                         height: launcherRoot.appItemHeight
                         radius: launcherRoot.appItemRadius
@@ -307,34 +387,14 @@ PanelWindow {
                         border.color: isSelected ? Colors.bg3 : "transparent"
                         border.width: 2
 
-                        function trigger() {
-                            let appName = modelData.name.toLowerCase();
-                            let cliApps = ["htop", "btop", "yazi", "ranger", "lf", "cava", "ncmpcpp", "nvtop", "pulsemixer"];
-                            let cliMatch = "";
-
-                            for (let i = 0; i < cliApps.length; i++) {
-                                if (appName.includes(cliApps[i])) {
-                                    cliMatch = cliApps[i];
-                                    break;
-                                }
-                            }
-
-                            if (cliMatch !== "") {
-                                Quickshell.execDetached([launcherRoot.terminalEmulator, "-e", cliMatch]);
-                            } else {
-                                modelData.execute();
-                            }
-                            launcherRoot.visible = false;
-                        }
-
                         MouseArea {
                             id: appArea
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                appList.currentIndex = index;
-                                delegateRect.trigger();
+                                appList.currentIndex = delegateRect.index;
+                                launcherRoot.launchApp(delegateRect.modelData);
                             }
                         }
 
@@ -347,12 +407,12 @@ PanelWindow {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: launcherRoot.appIconSize
                                 height: launcherRoot.appIconSize
-                                source: modelData.icon ? Quickshell.iconPath(modelData.icon) : ""
+                                source: delegateRect.modelData.icon ? Quickshell.iconPath(delegateRect.modelData.icon) : ""
                             }
 
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: modelData.name || ""
+                                text: delegateRect.modelData.name || ""
                                 color: delegateRect.isSelected ? Colors.green : Colors.fg0
                                 font.family: launcherRoot.fontName
                                 font.pixelSize: launcherRoot.fontSizeAppTitle
@@ -390,6 +450,9 @@ PanelWindow {
 
                     delegate: Rectangle {
                         id: clipDelegateRect
+                        required property var modelData
+                        required property int index
+
                         width: ListView.view.width
                         height: launcherRoot.appItemHeight
                         radius: launcherRoot.appItemRadius
@@ -401,20 +464,14 @@ PanelWindow {
                         border.color: isSelected ? Colors.bg3 : "transparent"
                         border.width: 2
 
-                        function trigger() {
-                            let safeLine = modelData.rawLine.replace(/'/g, "'\\''");
-                            Quickshell.execDetached(["bash", "-c", "echo -E '" + safeLine + "' | cliphist decode | wl-copy"]);
-                            launcherRoot.visible = false;
-                        }
-
                         MouseArea {
                             id: clipArea
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                clipList.currentIndex = index;
-                                clipDelegateRect.trigger();
+                                clipList.currentIndex = clipDelegateRect.index;
+                                launcherRoot.copyClip(clipDelegateRect.modelData);
                             }
                         }
 
@@ -434,7 +491,7 @@ PanelWindow {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: parent.width - 110
-                                text: modelData.content
+                                text: clipDelegateRect.modelData.content
                                 color: clipDelegateRect.isSelected ? Colors.aqua : Colors.fg0
                                 font.family: launcherRoot.fontName
                                 font.pixelSize: launcherRoot.fontSizeAppTitle
@@ -442,7 +499,6 @@ PanelWindow {
                             }
                         }
 
-                        // QUICK ACTION ICONS
                         Row {
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.right: parent.right
@@ -478,7 +534,7 @@ PanelWindow {
                                     cursorShape: Qt.PointingHandCursor
                                     hoverEnabled: true
                                     onClicked: {
-                                        let safeLine = modelData.rawLine.replace(/'/g, "'\\''");
+                                        let safeLine = clipDelegateRect.modelData.rawLine.replace(/'/g, "'\\''");
                                         Quickshell.execDetached(["bash", "-c", "echo -E '" + safeLine + "' | cliphist decode | wl-copy"]);
                                         copyIconRect.isCopied = true;
                                         tickTimer.restart();
@@ -507,9 +563,9 @@ PanelWindow {
                                     cursorShape: Qt.PointingHandCursor
                                     hoverEnabled: true
                                     onClicked: {
-                                        let safeLine = modelData.rawLine.replace(/'/g, "'\\''");
+                                        let safeLine = clipDelegateRect.modelData.rawLine.replace(/'/g, "'\\''");
                                         Quickshell.execDetached(["bash", "-c", "echo -E '" + safeLine + "' | cliphist delete"]);
-                                        launcherRoot.allClips = launcherRoot.allClips.filter(c => c.clipId !== modelData.clipId);
+                                        launcherRoot.allClips = launcherRoot.allClips.filter(c => c.clipId !== clipDelegateRect.modelData.clipId);
                                         searchInput.forceActiveFocus();
                                     }
                                 }

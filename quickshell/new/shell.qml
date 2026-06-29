@@ -42,4 +42,12 @@ ShellRoot {
             }
         }
     }
+
+    Applauncher {
+        id: myLauncher
+    }
+
+    Keybinds {
+        launcherTarget: myLauncher
+    }
 }

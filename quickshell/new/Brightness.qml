@@ -1,4 +1,3 @@
-import Quickshell
 import Quickshell.Io
 import QtQuick
 import QtQuick.Layouts
@@ -10,18 +9,48 @@ RowLayout {
     property bool ready: false
     property int level: 0
 
-    Process {
-        id: brightProc
-        running: true
-        command: ["sh", "-c", "while true; do brightnessctl -m | awk -F, '{print int($4)}'; inotifywait -qq -e modify /sys/class/backlight/*/brightness; done"]
+    property int maxLevel: 100
+    property string backlightPath: ""
 
+    Process {
+        id: initProc
+        command: ["bash", "-c", "ls -1 /sys/class/backlight | head -n 1"]
+        running: true
         stdout: SplitParser {
             onRead: data => {
-                var val = parseInt(data.trim());
-                if (!isNaN(val)) {
-                    root.level = val;
-                    root.ready = true;
+                let dir = data.trim();
+                if (dir !== "") {
+                    root.backlightPath = "/sys/class/backlight/" + dir;
                 }
+            }
+        }
+    }
+
+    FileView {
+        id: maxFile
+        path: root.backlightPath !== "" ? root.backlightPath + "/max_brightness" : ""
+
+        onLoaded: {
+            let val = parseInt(maxFile.text().trim());
+            if (!isNaN(val)) {
+                root.maxLevel = val;
+                if (brightFile.loaded)
+                    brightFile.reload();
+            }
+        }
+    }
+
+    FileView {
+        id: brightFile
+        path: root.backlightPath !== "" ? root.backlightPath + "/actual_brightness" : ""
+        watchChanges: true
+        onFileChanged: brightFile.reload()
+
+        onLoaded: {
+            let val = parseInt(brightFile.text().trim());
+            if (!isNaN(val) && root.maxLevel > 0) {
+                root.level = Math.round((val / root.maxLevel) * 100);
+                root.ready = true;
             }
         }
     }
