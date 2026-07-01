@@ -19,7 +19,7 @@ RowLayout {
             implicitWidth: label.implicitWidth + 14
             implicitHeight: 22
             radius: 6
-            color: isActive ? Colors.bg4 : (ws ? Colors.bg2 : "transparent")
+            color: isActive ? Colors.green : (ws ? Colors.bg2 : "transparent")
 
             Behavior on color {
                 ColorAnimation {
@@ -31,10 +31,10 @@ RowLayout {
                 id: label
                 anchors.centerIn: parent
                 text: wsBotton.index + 1
-                color: wsBotton.isActive ? Colors.aqua : (wsBotton.ws ? Colors.fg : Colors.grey1)
+                color: wsBotton.isActive ? Colors.bg0 : (wsBotton.ws ? Colors.fg : Colors.grey1)
 
                 font {
-                    family: "SF Mono Light"
+                    family: "SF Pro Display"
                     pixelSize: 14
                     weight: 500
                 }

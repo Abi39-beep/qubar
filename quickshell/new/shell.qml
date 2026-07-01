@@ -1,8 +1,15 @@
+pragma ComponentBehavior: Bound
 import Quickshell
 import QtQuick
 import QtQuick.Layouts
 
 ShellRoot {
+    id: root
+
+    function toggleControlCenter() {
+        controlCenterWindow.visible = !controlCenterWindow.visible;
+    }
+
     Variants {
         model: Quickshell.screens
 
@@ -45,6 +52,10 @@ ShellRoot {
 
     Applauncher {
         id: myLauncher
+    }
+
+    Controlcenter {
+        id: controlCenterWindow
     }
 
     Keybinds {

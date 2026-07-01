@@ -6,8 +6,8 @@ import ".."
 
 Rectangle {
     id: batteryWidget
-    width: 38
-    height: 18
+    width: 40
+    height: 20
     radius: 11
     color: Colors.grey0
     anchors.verticalCenter: parent.verticalCenter
@@ -38,14 +38,33 @@ Rectangle {
             }
         }
     }
-    Text {
+    Row {
         anchors.centerIn: parent
-        text: batteryWidget.isCharging ? "󱐋" : `${batteryWidget.batPercent}%`
-        font.pixelSize: 12
-        font.family: "JetBrainsMono Nerd Font"
-        color: Colors.bg0
-        font.bold: true
+        spacing: 1
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: batteryWidget.isCharging
+            text: "󱐋"
+            color: Colors.bg0
+            font {
+                pixelSize: 12
+                family: "JetBrainsMono Nerd Font Propo"
+                bold: true
+            }
+        }
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: batteryWidget.batPercent
+            color: Colors.bg0
+            font {
+                pixelSize: 12
+                family: "JetBrainsMono Nerd Font Propo"
+                bold: true
+                letterSpacing: -0.5
+            }
+        }
     }
+
     MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor

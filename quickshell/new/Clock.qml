@@ -2,8 +2,16 @@ import Quickshell
 import QtQuick
 
 Text {
-    text: Qt.formatDateTime(clock.date, "hh:mm")
-    color: Colors.aqua
+    id: clockText
+
+    text: Qt.formatDateTime(clock.date, "hh:mmA")
+    color: clockArea.containsMouse ? Colors.green : Colors.aqua
+
+    Behavior on color {
+        ColorAnimation {
+            duration: 150
+        }
+    }
 
     font {
         family: "SF Mono Light"
@@ -15,5 +23,14 @@ Text {
     SystemClock {
         id: clock
         precision: SystemClock.Minutes
+    }
+
+    MouseArea {
+        id: clockArea
+        anchors.fill: parent
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        // qmllint disable unqualified
+        onClicked: controlCenterWindow.visible = !controlCenterWindow.visible
     }
 }

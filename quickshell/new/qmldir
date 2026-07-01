@@ -7,3 +7,10 @@ Networking 1.0 Networking.qml
 Brightness 1.0 Brightness.qml
 Applauncher 1.0 Applauncher.qml
 Keybinds 1.0 Keybinds.qml
+Controlcenter 1.0 Controlcenter.qml
+User 1.0 User.qml
+Wifi 1.0 Wifi.qml
+Wifimenu 1.0 Wifimenu.qml
+Bluetooth 1.0 Bluetooth.qml
+Bluetoothmenu 1.0 Bluetoothmenu.qml
+Profile 1.0 Profile.qml
