@@ -1,4 +1,3 @@
-import Quickshell
 import Quickshell.Hyprland
 import QtQuick
 import QtQuick.Layouts
@@ -19,7 +18,7 @@ RowLayout {
             implicitWidth: label.implicitWidth + 14
             implicitHeight: 22
             radius: 6
-            color: isActive ? Colors.green : (ws ? Colors.bg2 : "transparent")
+            color: isActive ? Colors.aqua : (ws ? Colors.bg2 : "transparent")
 
             Behavior on color {
                 ColorAnimation {

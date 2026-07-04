@@ -6,6 +6,8 @@ import Quickshell.Wayland
 PanelWindow {
     id: ccRoot
 
+    property alias currentView: ccBox.currentView
+
     WlrLayershell.namespace: "control_center"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
@@ -45,7 +47,7 @@ PanelWindow {
         anchors.rightMargin: 10
 
         width: currentView === "main" ? 420 : 400
-        height: (currentView === "main" ? mainColumn.height : (currentView === "wifi" ? wifiMenuView.height : btMenuView.height)) + 40
+        height: (currentView === "main" ? mainColumn.height : (currentView === "wifi" ? wifiMenuView.height : (currentView === "bluetooth" ? btMenuView.height : (currentView === "profile" ? profileMenuView.height : powerMenuView.height)))) + 40
 
         color: Colors.bg0
         radius: 24
@@ -108,8 +110,24 @@ PanelWindow {
                 }
             }
 
-            User {
+            // HEADER: User Profile & Power Buttons
+            RowLayout {
                 width: parent.width
+
+                User {}
+
+                Item {
+                    Layout.fillWidth: true
+                }
+
+                RowLayout {
+                    spacing: 8
+
+                    Power {
+                        onOpenMenu: ccBox.currentView = "power"
+                    }
+                    Settings {}
+                }
             }
 
             RowLayout {
@@ -121,7 +139,7 @@ PanelWindow {
                     Layout.fillWidth: true
                     Layout.preferredWidth: 1
                     Layout.preferredHeight: togglesCol.implicitHeight + 24
-                    color: "transparent"
+                    color: Colors.bg1
                     border.color: Colors.bg2
                     border.width: 2
                     radius: 20
@@ -140,56 +158,37 @@ PanelWindow {
                             onOpenMenu: ccBox.currentView = "bluetooth"
                         }
 
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 45
-                            color: Colors.bg1
-                            radius: 22
-                            Text {
-                                anchors.centerIn: parent
-                                text: "Profile"
-                                color: Colors.fg2
-                            }
+                        Profile {
+                            onOpenMenu: ccBox.currentView = "profile"
                         }
                     }
                 }
 
                 // RIGHT COLUMN (CPU/RAM)
-                ColumnLayout {
+                System {
                     Layout.fillWidth: true
                     Layout.preferredWidth: 1
-                    spacing: 12
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 80
-                        color: Colors.bg1
-                        radius: 16
-                        border.color: Colors.bg2
-                        border.width: 2
-                    }
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 80
-                        color: Colors.bg1
-                        radius: 16
-                        border.color: Colors.bg2
-                        border.width: 2
-                    }
+                    Layout.fillHeight: true
                 }
             }
 
             Rectangle {
                 width: parent.width
-                height: 120
+                height: 128
                 color: Colors.bg1
                 radius: 16
                 border.color: Colors.bg2
                 border.width: 2
+
+                Bmslider {
+                    anchors.centerIn: parent
+                    width: parent.width - 32
+                }
             }
         }
 
         // ==========================================
-        // VIEW 2: MENU
+        // VIEW 2: MENUS
         // ==========================================
         Wifimenu {
             id: wifiMenuView
@@ -200,6 +199,7 @@ PanelWindow {
 
             visible: opacity > 0
             opacity: ccBox.currentView === "wifi" ? 1.0 : 0.0
+
             Behavior on opacity {
                 NumberAnimation {
                     duration: 150
@@ -216,9 +216,9 @@ PanelWindow {
             anchors.right: parent.right
             anchors.margins: 20
 
-            // Fade in when view is active
             visible: opacity > 0
             opacity: ccBox.currentView === "bluetooth" ? 1.0 : 0.0
+
             Behavior on opacity {
                 NumberAnimation {
                     duration: 150
@@ -226,6 +226,45 @@ PanelWindow {
             }
 
             onCloseMenu: ccBox.currentView = "main"
+        }
+
+        Profilemenu {
+            id: profileMenuView
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: 20
+
+            visible: opacity > 0
+            opacity: ccBox.currentView === "profile" ? 1.0 : 0.0
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 150
+                }
+            }
+
+            onCloseMenu: ccBox.currentView = "main"
+        }
+
+        Powermenu {
+            id: powerMenuView
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: 20
+
+            visible: opacity > 0
+            opacity: ccBox.currentView === "power" ? 1.0 : 0.0
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 150
+                }
+            }
+
+            onCloseRequested: ccBox.currentView = "main"
+            onClosePanel: ccRoot.visible = false
         }
     }
 }

@@ -4,7 +4,7 @@ import Quickshell
 
 RowLayout {
     id: userRoot
-    spacing: 16
+    spacing: 12
 
     // 1. User Avatar (Circle)
     Rectangle {
@@ -25,7 +25,7 @@ RowLayout {
 
     // 2. Text Details
     ColumnLayout {
-        Layout.fillWidth: true
+        Layout.alignment: Qt.AlignVCenter
         spacing: 4
 
         Text {
@@ -43,44 +43,9 @@ RowLayout {
 
             SystemClock {
                 id: headerClock
-                precision: SystemClock.Minutes
+                precision: SystemClock.Days
             }
-            text: Qt.formatDateTime(headerClock.date, "hh:mm A • dddd, MMM d")
-        }
-    }
-
-    // 3. Icons (Settings & Power)
-    RowLayout {
-        spacing: 8
-
-        // Settings Button
-        Rectangle {
-            implicitWidth: 36
-            implicitHeight: 36
-            radius: 18
-            color: "transparent"
-            border.color: Colors.bg2
-            border.width: 2
-            Text {
-                anchors.centerIn: parent
-                text: ""
-                color: Colors.fg1
-                font.pixelSize: 16
-            }
-        }
-
-        // Power Button
-        Rectangle {
-            implicitWidth: 36
-            implicitHeight: 36
-            radius: 18
-            color: Colors.red
-            Text {
-                anchors.centerIn: parent
-                text: ""
-                color: Colors.bg0
-                font.pixelSize: 16
-            }
+            text: Qt.formatDateTime(headerClock.date, "dddd, MMM d")
         }
     }
 }

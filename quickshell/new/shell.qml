@@ -60,5 +60,6 @@ ShellRoot {
 
     Keybinds {
         launcherTarget: myLauncher
+        controlCenterTarget: controlCenterWindow
     }
 }

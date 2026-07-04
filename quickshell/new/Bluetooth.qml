@@ -3,12 +3,72 @@ import Quickshell.Bluetooth
 
 Rectangle {
     id: root
-
     signal openMenu
 
     property var adapter: Bluetooth.defaultAdapter
-    property bool isRadioOn: adapter ? adapter.enabled : false
+    readonly property bool isRadioOn: adapter ? adapter.enabled : false
     property string currentDevice: ""
+
+    property bool _hasAutoConnected: false
+    property var _pendingDevices: []
+
+    onIsRadioOnChanged: {
+        if (isRadioOn && !_hasAutoConnected) {
+            _hasAutoConnected = true;
+            if (Bluetooth.devices) {
+                let devs = Bluetooth.devices.values;
+                _pendingDevices = [];
+
+                for (let i = 0; i < devs.length; i++) {
+                    if (devs[i].trusted && !devs[i].connected) {
+                        _pendingDevices.push(devs[i]);
+                    }
+                }
+
+                _pendingDevices.sort((a, b) => {
+                    let aIsAudio = (a.icon && a.icon.indexOf("audio") !== -1) ? 1 : 0;
+                    let bIsAudio = (b.icon && b.icon.indexOf("audio") !== -1) ? 1 : 0;
+                    return bIsAudio - aIsAudio;
+                });
+
+                if (_pendingDevices.length > 0) {
+                    autoConnectQueueTimer.start();
+                }
+            }
+        }
+        if (!isRadioOn) {
+            _hasAutoConnected = false;
+            autoConnectQueueTimer.stop();
+            _pendingDevices = [];
+        }
+    }
+
+    Timer {
+        id: autoConnectQueueTimer
+        interval: 1000
+        repeat: true
+        onTriggered: {
+            if (root._pendingDevices.length === 0) {
+                stop();
+                return;
+            }
+
+            if (!Bluetooth.devices)
+                return;
+            let devs = Bluetooth.devices.values;
+
+            for (let i = 0; i < devs.length; i++) {
+                if (devs[i].state === BluetoothDeviceState.Connecting) {
+                    return;
+                }
+            }
+
+            let dev = root._pendingDevices.shift();
+            if (dev && !dev.connected && typeof dev.connect === "function") {
+                dev.connect();
+            }
+        }
+    }
 
     Timer {
         interval: 1000
@@ -33,12 +93,11 @@ Rectangle {
 
     property bool isHovered: menuArea.containsMouse || circleArea.containsMouse
 
-    // Match Wi-Fi Toggle sizing
     width: parent.width
     height: 56
     radius: 28
 
-    color: isRadioOn ? (isHovered ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.85) : Colors.blue) : (isHovered ? Colors.bg1 : Colors.bg0)
+    color: isRadioOn ? (isHovered ? Qt.rgba(Colors.aqua.r, Colors.aqua.g, Colors.aqua.b, 0.85) : Colors.aqua) : (isHovered ? Colors.bg1 : Colors.bg0)
     border.color: Colors.bg3
     border.width: isRadioOn ? 0 : 2
 
@@ -48,7 +107,6 @@ Rectangle {
         }
     }
 
-    // Nerd Font Icons
     function getBtIcon() {
         if (!isRadioOn)
             return "󰂲";
@@ -62,12 +120,10 @@ Rectangle {
         anchors.margins: 6
         spacing: 12
 
-        // 1. THE TOGGLE ICON CIRCLE
         Rectangle {
             width: 44
             height: 44
             radius: 22
-
             color: root.isRadioOn ? (circleArea.containsMouse ? Qt.rgba(0, 0, 0, 0.45) : Qt.rgba(0, 0, 0, 0.30)) : (circleArea.containsMouse ? Colors.bg3 : Colors.bg2)
             Behavior on color {
                 ColorAnimation {
@@ -78,7 +134,7 @@ Rectangle {
             Text {
                 anchors.centerIn: parent
                 text: root.getBtIcon()
-                font.family: "SF Pro Display" // Add your Nerd Font as fallback in system settings
+                font.family: "SF Pro Display"
                 font.pixelSize: 18
                 color: root.isRadioOn ? Colors.bg0 : Colors.fg0
                 opacity: root.isRadioOn ? 1.0 : 0.6
@@ -89,6 +145,7 @@ Rectangle {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
                 hoverEnabled: true
+
                 onClicked: {
                     if (root.adapter) {
                         root.adapter.enabled = !root.adapter.enabled;
@@ -100,7 +157,6 @@ Rectangle {
             }
         }
 
-        // 2. TEXT AND MENU EXPAND AREA
         Item {
             width: parent.width - 56
             height: parent.height
