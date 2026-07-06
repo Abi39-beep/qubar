@@ -62,6 +62,70 @@ Item {
     }
 
     GlobalShortcut {
+        name: "toggle_settings_menu"
+        description: "Open Quickshell Settings Menu Directly"
+
+        onPressed: {
+            if (bindsRoot.controlCenterTarget) {
+                if (bindsRoot.controlCenterTarget.visible && bindsRoot.controlCenterTarget.currentView === "settings") {
+                    bindsRoot.controlCenterTarget.visible = false;
+                } else {
+                    bindsRoot.controlCenterTarget.visible = true;
+                    bindsRoot.controlCenterTarget.currentView = "settings";
+                }
+            }
+        }
+    }
+
+    GlobalShortcut {
+        name: "toggle_theme_menu"
+        description: "Open Quickshell Theme Menu Directly"
+
+        onPressed: {
+            if (bindsRoot.controlCenterTarget) {
+                if (bindsRoot.controlCenterTarget.visible && bindsRoot.controlCenterTarget.currentView === "theme") {
+                    bindsRoot.controlCenterTarget.visible = false;
+                } else {
+                    bindsRoot.controlCenterTarget.visible = true;
+                    bindsRoot.controlCenterTarget.currentView = "theme";
+                }
+            }
+        }
+    }
+
+    GlobalShortcut {
+        name: "toggle_wallpaper_menu"
+        description: "Open Quickshell Wallpaper Menu Directly"
+
+        onPressed: {
+            if (bindsRoot.controlCenterTarget) {
+                if (bindsRoot.controlCenterTarget.visible && bindsRoot.controlCenterTarget.currentView === "wallpaper") {
+                    bindsRoot.controlCenterTarget.visible = false;
+                } else {
+                    bindsRoot.controlCenterTarget.visible = true;
+                    bindsRoot.controlCenterTarget.currentView = "wallpaper";
+                }
+            }
+        }
+    }
+
+    GlobalShortcut {
+        name: "toggle_bar_menu"
+        description: "Open Quickshell Bar Layouts Menu Directly"
+
+        onPressed: {
+            if (bindsRoot.controlCenterTarget) {
+                if (bindsRoot.controlCenterTarget.visible && bindsRoot.controlCenterTarget.currentView === "bar") {
+                    bindsRoot.controlCenterTarget.visible = false;
+                } else {
+                    bindsRoot.controlCenterTarget.visible = true;
+                    bindsRoot.controlCenterTarget.currentView = "bar";
+                }
+            }
+        }
+    }
+
+    GlobalShortcut {
         name: "close_all"
         description: "Close all Quickshell Overlays"
 

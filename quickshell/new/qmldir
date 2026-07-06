@@ -20,3 +20,7 @@ Bmslider 1.0 Bmslider.qml
 Settings 1.0 Settings.qml
 Power 1.0 Power.qml
 Powermenu 1.0 Powermenu.qml
+Thememenu 1.0 Thememenu.qml
+Wallpapermenu 1.0 Wallpapermenu.qml
+Barmenu 1.0 Barmenu.qml
+Calendarmenu 1.0 Calendarmenu.qml

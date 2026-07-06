@@ -20,9 +20,9 @@ Item {
 
     focus: true
     Keys.onEscapePressed: {
-        if (currentView === 1 || currentView === 2 || currentView === 3) {
+        if (currentView === 1 || currentView === 2 || currentView === 3 || currentView === 6) {
             currentView = 0;
-        } else if (currentView === 4 || currentView === 5) {
+        } else if (currentView === 4 || currentView === 5 || currentView === 7) {
             currentView = 3;
         } else {
             closeRequested();
@@ -148,8 +148,9 @@ Item {
                 width: (parent.width - 12) / 2
                 onOpenMenuRequested: ccRoot.currentView = 2
             }
-            Display {
+            Profile {
                 width: (parent.width - 12) / 2
+                onOpenMenu: ccRoot.currentView = 6
             }
             Peace {
                 width: (parent.width - 12) / 2
@@ -162,7 +163,7 @@ Item {
     }
 
     // ==========================================
-    // VIEW 1 & 2: WI-FI & BLUETOOTH
+    // MENU-VIEW
     // ==========================================
     WifiMenu {
         anchors.fill: parent
@@ -178,9 +179,13 @@ Item {
         onBackRequested: ccRoot.currentView = 0
     }
 
-    // ==========================================
-    // VIEW 3: SETTINGS MENU
-    // ==========================================
+    ProfileMenu {
+        anchors.fill: parent
+        anchors.margins: Config.ccPadding
+        visible: ccRoot.currentView === 6
+        onCloseMenu: ccRoot.currentView = 0
+    }
+
     Setting {
         anchors.fill: parent
         anchors.margins: Config.ccPadding
@@ -188,11 +193,9 @@ Item {
         onBackRequested: ccRoot.currentView = 0
         onOpenThemeRequested: ccRoot.currentView = 4
         onOpenWallpaperRequested: ccRoot.currentView = 5
+        onOpenBarRequested: ccRoot.currentView = 7
     }
 
-    // ==========================================
-    // VIEW 4: THEME MENU
-    // ==========================================
     ThemeMenu {
         anchors.fill: parent
         anchors.margins: Config.ccPadding
@@ -200,13 +203,17 @@ Item {
         onBackRequested: ccRoot.currentView = 3
     }
 
-    // ==========================================
-    // VIEW 5: WALLPAPER MENU
-    // ==========================================
     WallpaperMenu {
         anchors.fill: parent
         anchors.margins: Config.ccPadding
         visible: ccRoot.currentView === 5
         onBackRequested: ccRoot.currentView = 3
+    }
+
+    BarMenu {
+        anchors.fill: parent
+        anchors.margins: Config.ccPadding
+        visible: ccRoot.currentView === 7
+        onCloseMenu: ccRoot.currentView = 3
     }
 }

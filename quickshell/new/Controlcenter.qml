@@ -5,7 +5,6 @@ import Quickshell.Wayland
 
 PanelWindow {
     id: ccRoot
-
     property alias currentView: ccBox.currentView
 
     WlrLayershell.namespace: "control_center"
@@ -24,9 +23,20 @@ PanelWindow {
     color: "transparent"
     visible: false
 
+    Timer {
+        id: resetTimer
+        interval: 300
+        onTriggered: ccBox.currentView = "main"
+    }
+
     onVisibleChanged: {
         if (!visible) {
-            ccBox.currentView = "main";
+            resetTimer.restart();
+        } else {
+            resetTimer.stop();
+            if (ccBox.currentView === "main") {
+                ccBox.forceActiveFocus();
+            }
         }
     }
 
@@ -39,7 +49,16 @@ PanelWindow {
     Rectangle {
         id: ccBox
 
+        focus: true
+        Keys.onEscapePressed: ccRoot.visible = false
+
         property string currentView: "main"
+
+        onCurrentViewChanged: {
+            if (currentView === "main" && ccRoot.visible) {
+                ccBox.forceActiveFocus();
+            }
+        }
 
         anchors.top: parent.top
         anchors.right: parent.right
@@ -47,13 +66,12 @@ PanelWindow {
         anchors.rightMargin: 10
 
         width: currentView === "main" ? 420 : 400
-        height: (currentView === "main" ? mainColumn.height : (currentView === "wifi" ? wifiMenuView.height : (currentView === "bluetooth" ? btMenuView.height : (currentView === "profile" ? profileMenuView.height : powerMenuView.height)))) + 40
+        height: (currentView === "main" ? mainColumn.height : (currentView === "wifi" ? wifiMenuView.height : (currentView === "bluetooth" ? btMenuView.height : (currentView === "profile" ? profileMenuView.height : (currentView === "settings" ? settingsMenuView.height : (currentView === "theme" ? themeMenuView.height : (currentView === "wallpaper" ? wallMenuView.height : (currentView === "bar" ? barMenuView.height : (currentView === "calendar" ? calMenuView.height : powerMenuView.height))))))))) + 40
 
         color: Colors.bg0
         radius: 24
         border.color: Colors.bg2
         border.width: 2
-
         clip: true
 
         transformOrigin: Item.TopRight
@@ -75,14 +93,14 @@ PanelWindow {
 
         Behavior on width {
             NumberAnimation {
-                duration: 200
+                duration: ccBox.opacity < 0.1 ? 0 : 200
                 easing.type: Easing.OutQuart
             }
         }
 
         Behavior on height {
             NumberAnimation {
-                duration: 200
+                duration: ccBox.opacity < 0.1 ? 0 : 200
                 easing.type: Easing.OutQuart
             }
         }
@@ -100,13 +118,14 @@ PanelWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.margins: 20
-            spacing: 24
+            spacing: 16
 
             visible: opacity > 0
             opacity: ccBox.currentView === "main" ? 1.0 : 0.0
+
             Behavior on opacity {
                 NumberAnimation {
-                    duration: 150
+                    duration: ccBox.opacity < 0.1 ? 0 : 150
                 }
             }
 
@@ -114,7 +133,9 @@ PanelWindow {
             RowLayout {
                 width: parent.width
 
-                User {}
+                User {
+                    onOpenCalendar: ccBox.currentView = "calendar"
+                }
 
                 Item {
                     Layout.fillWidth: true
@@ -126,7 +147,38 @@ PanelWindow {
                     Power {
                         onOpenMenu: ccBox.currentView = "power"
                     }
-                    Settings {}
+
+                    // Static Settings Gear
+                    Rectangle {
+                        implicitWidth: 36
+                        implicitHeight: 36
+                        radius: 18
+                        color: gearArea.containsMouse ? Colors.bg2 : "transparent"
+                        border.color: Colors.bg2
+                        border.width: 2
+
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: 150
+                            }
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: ""
+                            color: Colors.fg1
+                            font.pixelSize: 16
+                            font.family: "JetBrainsMono Nerd Font"
+                        }
+
+                        MouseArea {
+                            id: gearArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: ccBox.currentView = "settings"
+                        }
+                    }
                 }
             }
 
@@ -153,11 +205,9 @@ PanelWindow {
                         Wifi {
                             onOpenMenu: ccBox.currentView = "wifi"
                         }
-
                         Bluetooth {
                             onOpenMenu: ccBox.currentView = "bluetooth"
                         }
-
                         Profile {
                             onOpenMenu: ccBox.currentView = "profile"
                         }
@@ -188,7 +238,7 @@ PanelWindow {
         }
 
         // ==========================================
-        // VIEW 2: MENUS
+        // VIEW 2: ALL MENUS
         // ==========================================
         Wifimenu {
             id: wifiMenuView
@@ -196,16 +246,13 @@ PanelWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.margins: 20
-
             visible: opacity > 0
             opacity: ccBox.currentView === "wifi" ? 1.0 : 0.0
-
             Behavior on opacity {
                 NumberAnimation {
-                    duration: 150
+                    duration: ccBox.opacity < 0.1 ? 0 : 150
                 }
             }
-
             onCloseMenu: ccBox.currentView = "main"
         }
 
@@ -215,16 +262,13 @@ PanelWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.margins: 20
-
             visible: opacity > 0
             opacity: ccBox.currentView === "bluetooth" ? 1.0 : 0.0
-
             Behavior on opacity {
                 NumberAnimation {
-                    duration: 150
+                    duration: ccBox.opacity < 0.1 ? 0 : 150
                 }
             }
-
             onCloseMenu: ccBox.currentView = "main"
         }
 
@@ -234,16 +278,13 @@ PanelWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.margins: 20
-
             visible: opacity > 0
             opacity: ccBox.currentView === "profile" ? 1.0 : 0.0
-
             Behavior on opacity {
                 NumberAnimation {
-                    duration: 150
+                    duration: ccBox.opacity < 0.1 ? 0 : 150
                 }
             }
-
             onCloseMenu: ccBox.currentView = "main"
         }
 
@@ -253,18 +294,104 @@ PanelWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.margins: 20
-
             visible: opacity > 0
             opacity: ccBox.currentView === "power" ? 1.0 : 0.0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: ccBox.opacity < 0.1 ? 0 : 150
+                }
+            }
+            onCloseRequested: ccBox.currentView = "main"
+            onClosePanel: ccRoot.visible = false
+        }
+
+        Settings {
+            id: settingsMenuView
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: 20
+            visible: opacity > 0
+            opacity: ccBox.currentView === "settings" ? 1.0 : 0.0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: ccBox.opacity < 0.1 ? 0 : 150
+                }
+            }
+            onCloseMenu: ccBox.currentView = "main"
+            onOpenThemeMenu: ccBox.currentView = "theme"
+            onOpenWallpaperMenu: ccBox.currentView = "wallpaper"
+            onOpenBarMenu: ccBox.currentView = "bar"
+        }
+
+        Thememenu {
+            id: themeMenuView
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: 20
+            visible: opacity > 0
+            opacity: ccBox.currentView === "theme" ? 1.0 : 0.0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: ccBox.opacity < 0.1 ? 0 : 150
+                }
+            }
+            onCloseMenu: ccBox.currentView = "settings"
+        }
+
+        Wallpapermenu {
+            id: wallMenuView
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: 20
+            visible: opacity > 0
+            opacity: ccBox.currentView === "wallpaper" ? 1.0 : 0.0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: ccBox.opacity < 0.1 ? 0 : 150
+                }
+            }
+            onCloseMenu: ccBox.currentView = "settings"
+        }
+
+        Barmenu {
+            id: barMenuView
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: 20
+
+            visible: opacity > 0
+            opacity: ccBox.currentView === "bar" ? 1.0 : 0.0
 
             Behavior on opacity {
                 NumberAnimation {
-                    duration: 150
+                    duration: ccBox.opacity < 0.1 ? 0 : 150
                 }
             }
 
-            onCloseRequested: ccBox.currentView = "main"
-            onClosePanel: ccRoot.visible = false
+            onCloseMenu: ccBox.currentView = "settings"
+        }
+
+        Calendarmenu {
+            id: calMenuView
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: 20
+
+            visible: opacity > 0
+            opacity: ccBox.currentView === "calendar" ? 1.0 : 0.0
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: ccBox.opacity < 0.1 ? 0 : 150
+                }
+            }
+
+            onCloseMenu: ccBox.currentView = "main"
         }
     }
 }

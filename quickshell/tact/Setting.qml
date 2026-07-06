@@ -5,6 +5,44 @@ Item {
     signal backRequested
     signal openThemeRequested
     signal openWallpaperRequested
+    signal openBarRequested
+
+    property int currentIndex: -1
+
+    onVisibleChanged: {
+        if (visible) {
+            forceActiveFocus();
+            currentIndex = -1;
+        }
+    }
+
+    // --- KEYBOARD NAVIGATION ---
+    Keys.onEscapePressed: settingRoot.backRequested()
+    Keys.onDownPressed: {
+        if (currentIndex === -1)
+            currentIndex = 0;
+        else
+            currentIndex = (currentIndex + 1) % 3;
+    }
+    Keys.onUpPressed: {
+        if (currentIndex === -1)
+            currentIndex = 2;
+        else
+            currentIndex = (currentIndex + 2) % 3;
+    }
+    Keys.onReturnPressed: if (currentIndex !== -1)
+        executeCurrent()
+    Keys.onEnterPressed: if (currentIndex !== -1)
+        executeCurrent()
+
+    function executeCurrent() {
+        if (currentIndex === 0)
+            settingRoot.openThemeRequested();
+        else if (currentIndex === 1)
+            settingRoot.openWallpaperRequested();
+        else if (currentIndex === 2)
+            settingRoot.openBarRequested();
+    }
 
     Column {
         anchors.fill: parent
@@ -68,12 +106,17 @@ Item {
             width: parent.width
             height: 52
             radius: 12
-            color: themeBtnArea.containsMouse || activeFocus ? Colors.bg2 : Colors.bg1
-            border.color: themeBtnArea.containsMouse || activeFocus ? Colors.bg3 : Colors.bg2
+
+            color: (themeBtnArea.containsMouse || settingRoot.currentIndex === 0) ? Colors.bg2 : Colors.bg1
+            border.color: (themeBtnArea.containsMouse || settingRoot.currentIndex === 0) ? Colors.bg3 : Colors.bg2
             border.width: 1
-            focus: true
 
             Behavior on color {
+                ColorAnimation {
+                    duration: 150
+                }
+            }
+            Behavior on border.color {
                 ColorAnimation {
                     duration: 150
                 }
@@ -112,12 +155,12 @@ Item {
                 font.pixelSize: 18
             }
 
-            Keys.onReturnPressed: settingRoot.openThemeRequested()
             MouseArea {
                 id: themeBtnArea
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
                 hoverEnabled: true
+                onEntered: settingRoot.currentIndex = 0
                 onClicked: settingRoot.openThemeRequested()
             }
         }
@@ -127,12 +170,17 @@ Item {
             width: parent.width
             height: 52
             radius: 12
-            color: wallBtnArea.containsMouse || activeFocus ? Colors.bg2 : Colors.bg1
-            border.color: wallBtnArea.containsMouse || activeFocus ? Colors.bg3 : Colors.bg2
+
+            color: (wallBtnArea.containsMouse || settingRoot.currentIndex === 1) ? Colors.bg2 : Colors.bg1
+            border.color: (wallBtnArea.containsMouse || settingRoot.currentIndex === 1) ? Colors.bg3 : Colors.bg2
             border.width: 1
-            focus: true
 
             Behavior on color {
+                ColorAnimation {
+                    duration: 150
+                }
+            }
+            Behavior on border.color {
                 ColorAnimation {
                     duration: 150
                 }
@@ -171,13 +219,77 @@ Item {
                 font.pixelSize: 18
             }
 
-            Keys.onReturnPressed: settingRoot.openWallpaperRequested()
             MouseArea {
                 id: wallBtnArea
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
                 hoverEnabled: true
+                onEntered: settingRoot.currentIndex = 1
                 onClicked: settingRoot.openWallpaperRequested()
+            }
+        }
+
+        // 3. BAR LAYOUTS BUTTON
+        Rectangle {
+            width: parent.width
+            height: 52
+            radius: 12
+
+            color: (barBtnArea.containsMouse || settingRoot.currentIndex === 2) ? Colors.bg2 : Colors.bg1
+            border.color: (barBtnArea.containsMouse || settingRoot.currentIndex === 2) ? Colors.bg3 : Colors.bg2
+            border.width: 1
+
+            Behavior on color {
+                ColorAnimation {
+                    duration: 150
+                }
+            }
+            Behavior on border.color {
+                ColorAnimation {
+                    duration: 150
+                }
+            }
+
+            Row {
+                anchors.left: parent.left
+                anchors.leftMargin: 16
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 16
+
+                Text {
+                    text: "󰹯"
+                    color: Colors.aqua
+                    font.family: Config.fontName
+                    font.pixelSize: 18
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                Text {
+                    text: "Bar Layouts"
+                    color: Colors.fg0
+                    font.family: Config.fontName
+                    font.pixelSize: 14
+                    font.bold: true
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
+            Text {
+                anchors.right: parent.right
+                anchors.rightMargin: 16
+                anchors.verticalCenter: parent.verticalCenter
+                text: "󰅂"
+                color: Colors.fg3
+                font.family: Config.fontName
+                font.pixelSize: 18
+            }
+
+            MouseArea {
+                id: barBtnArea
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                hoverEnabled: true
+                onEntered: settingRoot.currentIndex = 2
+                onClicked: settingRoot.openBarRequested()
             }
         }
     }

@@ -5,7 +5,8 @@ AppLauncher 1.0 AppLauncher.qml
 Bluetooth 1.0 Bluetooth.qml
 BluetoothMenu 1.0 BluetoothMenu.qml
 ControlCenter 1.0 ControlCenter.qml
-Display 1.0 Display.qml
+Profile 1.0 Profile.qml
+ProfileMenu 1.0 ProfileMenu.qml
 Equalizer 1.0 Equalizer.qml
 Keybinds 1.0 Keybinds.qml
 MediaController 1.0 MediaController.qml
@@ -20,3 +21,4 @@ Volume 1.0 Volume.qml
 WallpaperMenu 1.0 WallpaperMenu.qml
 Wifi 1.0 Wifi.qml
 WifiMenu 1.0 WifiMenu.qml
+BarMenu 1.0 BarMenu.qml

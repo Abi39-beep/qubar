@@ -5,11 +5,21 @@ import Quickshell.Io
 
 Item {
     id: themeRoot
-    signal backRequested
+    height: 288
+
+    signal closeMenu
 
     property string activeTheme: ""
     property var themeData: []
     property string pendingTheme: ""
+
+    onVisibleChanged: {
+        if (visible) {
+            forceActiveFocus();
+        }
+    }
+
+    Keys.onEscapePressed: themeRoot.closeMenu()
 
     // ==========================================
     // 1. AUTOMATIC EXTERNAL APP ENGINE
@@ -164,7 +174,7 @@ Item {
     }
 
     // ==========================================
-    // 2. THEME DATA ENGINE (One-Time Startup Fetch)
+    // 2. THEME DATA ENGINE
     // ==========================================
     Process {
         id: getActiveProc
@@ -209,7 +219,7 @@ Item {
                 }
             }
             themeRoot.themeData = tempArr;
-            scanThemesProc.themeBuffer = ""; // Clear memory
+            scanThemesProc.themeBuffer = "";
         }
     }
 
@@ -223,7 +233,7 @@ Item {
         // --- HEADER ---
         Item {
             width: parent.width
-            height: 36
+            height: 32
 
             Row {
                 anchors.left: parent.left
@@ -231,12 +241,12 @@ Item {
                 spacing: 12
 
                 Rectangle {
-                    width: 36
-                    height: 36
-                    radius: 18
-                    color: backArea.containsMouse ? Colors.bg2 : Colors.bg1
-                    border.color: Colors.bg3
-                    border.width: 1
+                    width: 32
+                    height: 32
+                    radius: 16
+                    color: backArea.containsMouse ? Colors.bg2 : "transparent"
+                    border.color: Colors.bg2
+                    border.width: 2
 
                     Behavior on color {
                         ColorAnimation {
@@ -246,27 +256,27 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: "󰁍"
-                        font.family: Config.fontName
-                        font.pixelSize: 18
-                        color: Colors.fg0
+                        text: ""
+                        color: Colors.fg2
+                        font.family: "JetBrainsMono Nerd Font"
+                        font.pixelSize: 14
                     }
                     MouseArea {
                         id: backArea
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         hoverEnabled: true
-                        onClicked: themeRoot.backRequested()
+                        onClicked: themeRoot.closeMenu()
                     }
                 }
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     text: "Themes"
-                    font.family: Config.fontName
+                    color: Colors.fg0
                     font.pixelSize: 16
                     font.bold: true
-                    color: Colors.fg0
+                    font.family: "SF Pro Display"
                 }
             }
         }
@@ -274,7 +284,7 @@ Item {
         // --- DYNAMIC THEME GRID ---
         Flickable {
             width: parent.width
-            height: parent.height - 53
+            height: parent.height - 48
             contentHeight: grid.height
             clip: true
 
@@ -328,7 +338,7 @@ Item {
                             Text {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: "󰑐"
-                                font.family: Config.fontName
+                                font.family: "JetBrainsMono Nerd Font"
                                 font.pixelSize: 18
                                 color: delegateRect.modelData.accHex
                                 visible: delegateRect.isApplying
@@ -354,7 +364,7 @@ Item {
                             Text {
                                 text: delegateRect.modelData.name
                                 color: delegateRect.isSelected ? delegateRect.modelData.accHex : Colors.fg1
-                                font.family: Config.fontName
+                                font.family: "SF Pro Display"
                                 font.pixelSize: 13
                                 font.bold: delegateRect.isSelected
                                 anchors.horizontalCenter: parent.horizontalCenter
