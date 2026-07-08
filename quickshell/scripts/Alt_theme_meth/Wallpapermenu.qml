@@ -8,19 +8,24 @@ import Qt5Compat.GraphicalEffects
 Item {
     id: wallRoot
     height: 240
+
     signal closeMenu
+
     property string activeWallpaper: ""
 
     Timer {
         id: grabFocusTimer
         interval: 100
         running: false
-        onTriggered: grid.forceActiveFocus()
+        onTriggered: {
+            grid.forceActiveFocus();
+        }
     }
 
     function resetSelection() {
         if (wallRoot.activeWallpaper === "")
             return;
+
         for (let i = 0; i < wallModel.count; i++) {
             if (wallModel.get(i).filePath === wallRoot.activeWallpaper) {
                 grid.currentIndex = i;
@@ -43,7 +48,7 @@ Item {
 
     Process {
         id: fetchProc
-        command: ["bash", "-c", "theme=$(cat ~/.cache/current_theme 2>/dev/null); find \"$HOME/.config/quickshell/themes/$theme\" -maxdepth 1 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \\) 2>/dev/null | sort"]
+        command: ["bash", "-c", "theme=$(cat ~/.cache/current_theme); find ~/.config/color-scheme/$theme -maxdepth 1 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \\) | sort"]
         running: true
         stdout: SplitParser {
             onRead: data => {
@@ -55,6 +60,7 @@ Item {
                 }
             }
         }
+
         // qmllint disable signal-handler-parameters
         onExited: {
             if (grid.currentIndex === -1)
@@ -69,7 +75,8 @@ Item {
         command: ["bash", "-c", "readlink -f ~/.cache/current_wallpaper"]
         stdout: SplitParser {
             onRead: data => {
-                wallRoot.activeWallpaper = data.trim();
+                let path = data.trim();
+                wallRoot.activeWallpaper = path;
                 wallRoot.resetSelection();
             }
         }
@@ -78,9 +85,8 @@ Item {
     function applyWallpaper(path) {
         wallRoot.activeWallpaper = path;
         wallRoot.resetSelection();
-        let cleanPath = path.toString().replace("file://", "");
-        let home = Quickshell.env("HOME");
-        Quickshell.execDetached(["bash", "-c", `echo "${cleanPath}" > "${home}/.cache/current_wallpaper"`]);
+        let scriptPath = Quickshell.env("HOME") + "/.config/quickshell/scripts/set_wallpaper.sh";
+        Quickshell.execDetached(["bash", scriptPath, path]);
     }
 
     Column {
@@ -91,10 +97,12 @@ Item {
         Item {
             width: parent.width
             height: 32
+
             Row {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 12
+
                 Rectangle {
                     width: 32
                     height: 32
@@ -102,11 +110,13 @@ Item {
                     color: backArea.containsMouse ? Colors.bg2 : "transparent"
                     border.color: Colors.bg2
                     border.width: 2
+
                     Behavior on color {
                         ColorAnimation {
                             duration: 150
                         }
                     }
+
                     Text {
                         anchors.centerIn: parent
                         text: ""
@@ -122,6 +132,7 @@ Item {
                         onClicked: wallRoot.closeMenu()
                     }
                 }
+
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     text: "Wallpapers"
@@ -138,8 +149,10 @@ Item {
             id: grid
             width: parent.width
             height: parent.height - 48
+
             cellWidth: parent.width / 3
             cellHeight: 96
+
             model: wallModel
             clip: true
             focus: true
@@ -151,6 +164,7 @@ Item {
                 }
                 event.accepted = true;
             }
+
             Keys.onRightPressed: event => {
                 if (currentIndex < wallModel.count - 1) {
                     currentIndex++;
@@ -158,6 +172,7 @@ Item {
                 }
                 event.accepted = true;
             }
+
             Keys.onUpPressed: event => {
                 if (currentIndex >= 3) {
                     currentIndex -= 3;
@@ -165,6 +180,7 @@ Item {
                 }
                 event.accepted = true;
             }
+
             Keys.onDownPressed: event => {
                 if (currentIndex + 3 < wallModel.count) {
                     currentIndex += 3;
@@ -174,16 +190,19 @@ Item {
                 positionViewAtIndex(currentIndex, GridView.Contain);
                 event.accepted = true;
             }
+
             Keys.onReturnPressed: event => {
                 if (currentIndex >= 0 && currentIndex < wallModel.count)
                     wallRoot.applyWallpaper(wallModel.get(currentIndex).filePath);
                 event.accepted = true;
             }
+
             Keys.onEnterPressed: event => {
                 if (currentIndex >= 0 && currentIndex < wallModel.count)
                     wallRoot.applyWallpaper(wallModel.get(currentIndex).filePath);
                 event.accepted = true;
             }
+
             Keys.onEscapePressed: event => {
                 wallRoot.closeMenu();
                 event.accepted = true;
@@ -196,12 +215,14 @@ Item {
 
                 width: grid.cellWidth
                 height: grid.cellHeight
+
                 z: grid.currentIndex === index ? 10 : 1
 
                 Item {
                     id: innerContainer
                     anchors.fill: parent
                     anchors.margins: 12
+
                     property bool isActive: wallRoot.activeWallpaper === delegateRoot.filePath
                     property bool isFocused: grid.currentIndex === delegateRoot.index
 
@@ -216,7 +237,7 @@ Item {
                     Image {
                         id: rawImg
                         anchors.fill: parent
-                        source: encodeURI("file://" + delegateRoot.filePath)
+                        source: "file://" + delegateRoot.filePath
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         cache: true
@@ -230,6 +251,7 @@ Item {
                         radius: 12
                         visible: false
                     }
+
                     OpacityMask {
                         anchors.fill: parent
                         source: rawImg
@@ -246,12 +268,14 @@ Item {
                             }
                         }
                     }
+
                     Rectangle {
                         anchors.fill: parent
                         radius: 12
                         color: "transparent"
                         border.color: parent.isActive ? Colors.aqua : (parent.isFocused ? Colors.fg0 : "transparent")
                         border.width: parent.isActive ? 2 : (parent.isFocused ? 1 : 0)
+
                         Behavior on border.color {
                             ColorAnimation {
                                 duration: 150

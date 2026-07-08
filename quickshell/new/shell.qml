@@ -62,4 +62,8 @@ ShellRoot {
         launcherTarget: myLauncher
         controlCenterTarget: controlCenterWindow
     }
+
+    WallpaperBg {
+        id: destopWallpaper
+    }
 }
