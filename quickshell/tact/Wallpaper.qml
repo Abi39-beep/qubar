@@ -1,35 +1,90 @@
 import QtQuick
 import Quickshell
-import Quickshell.Wayland
+import Qt.labs.folderlistmodel
 
-PanelWindow {
-    id: wallpaperRoot
-    color: Colors.bg0
+Item {
+    id: wallEngine
 
-    // Force it to the absolute background
-    WlrLayershell.layer: WlrLayer.Background
+    property string targetTheme: ""
+    property bool wantsRandom: false
+    property bool pendingRestart: false
 
-    // THE FIX: Tell the wallpaper to ignore the space reserved by your top bar!
-    // This forces it to cover 100% of the screen.
-    exclusionMode: ExclusionMode.Ignore
+    property string homeDir: Quickshell.env("HOME")
+    property string cachePath: homeDir + "/.cache/current_wallpaper"
 
-    // Stretch to all 4 corners of the monitor
-    anchors {
-        top: true
-        bottom: true
-        left: true
-        right: true
+    Timer {
+        id: fallbackRestartTimer
+        interval: 1000
+        running: false
+        onTriggered: wallEngine.checkAndRestart()
     }
 
-    Image {
-        anchors.fill: parent
+    FolderListModel {
+        id: randomModel
+        folder: wallEngine.targetTheme !== "" ? "file://" + wallEngine.homeDir + "/.config/quickshell/themes/" + wallEngine.targetTheme : ""
+        nameFilters: ["*.jpg", "*.jpeg", "*.png", "*.webp"]
+        caseSensitive: false
+        showDirs: false
 
-        // Dynamic loading bypassing the cache
-        source: "file://" + Quickshell.env("HOME") + "/.cache/current_wallpaper?" + new Date().getTime()
+        onStatusChanged: {
+            if (status === FolderListModel.Ready && wallEngine.wantsRandom) {
+                wallEngine.wantsRandom = false;
+                wallEngine.pickRandomAndApply();
+            }
+        }
+    }
 
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-        smooth: true
-        mipmap: true
+    // Helper to dry up the random selection logic
+    function pickRandomAndApply() {
+        if (randomModel.count > 0) {
+            const idx = Math.floor(Math.random() * randomModel.count);
+            const path = randomModel.get(idx, "filePath").toString();
+            wallEngine.apply(path);
+        } else {
+            wallEngine.checkAndRestart();
+        }
+    }
+
+    // Helper to keep restart logic DRY
+    function checkAndRestart() {
+        if (wallEngine.pendingRestart) {
+            wallEngine.pendingRestart = false;
+            fallbackRestartTimer.stop();
+            wallEngine.triggerRestart();
+        }
+    }
+
+    function apply(path) {
+        if (!path) {
+            wallEngine.checkAndRestart();
+            return;
+        }
+
+        Quickshell.execDetached(["sh", "-c", 'printf "%s\n" "$1" > "$2"', "--", path.toString(), wallEngine.cachePath]);
+
+        wallEngine.checkAndRestart();
+    }
+
+    function applyRandom(themeName, triggerRestartAfter) {
+        wallEngine.wantsRandom = true;
+        wallEngine.pendingRestart = (triggerRestartAfter === true);
+
+        if (wallEngine.pendingRestart) {
+            fallbackRestartTimer.restart();
+        }
+
+        if (wallEngine.targetTheme === themeName && randomModel.status === FolderListModel.Ready) {
+            wallEngine.wantsRandom = false;
+            wallEngine.pickRandomAndApply();
+        } else {
+            wallEngine.targetTheme = themeName;
+        }
+    }
+
+    function triggerRestart() {
+        const reloadScript = wallEngine.homeDir + "/.config/quickshell/reload.sh";
+        const cmd = 'sleep 0.2 && if [ -f "$1" ]; then bash "$1" & else killall quickshell && quickshell & fi';
+
+        Quickshell.execDetached(["sh", "-c", cmd, "--", reloadScript]);
     }
 }

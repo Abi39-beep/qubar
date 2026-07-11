@@ -85,7 +85,7 @@ Item {
             name: "Sleep",
             icon: "󰒲",
             color: Colors.blue,
-            cmd: ["systemctl", "suspend"]
+            cmd: ["sh", "-c", "loginctl lock-session && sleep 1 && systemctl suspend"]
         },
         {
             name: "Logout",

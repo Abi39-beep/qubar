@@ -1,6 +1,7 @@
 import Quickshell.Networking
 import QtQuick
 import QtQuick.Layouts
+import ".."
 
 RowLayout {
     id: root
@@ -27,24 +28,7 @@ RowLayout {
 
         font {
             family: "JetBrainsMono Nerd Font Propo"
-            pixelSize: 16
-        }
-    }
-
-    Text {
-        text: {
-            if (!Networking.wifiEnabled)
-                return "off";
-            if (!root.active)
-                return "Disconnected";
-            return root.active.name;
-        }
-
-        color: Colors.fg
-
-        font {
-            family: "SF Pro Display Light"
-            weight: 700
+            pixelSize: 18
         }
     }
 }

@@ -1,0 +1,29 @@
+module Meth
+
+Applauncher 1.0 Applauncher.qml
+Barmenu 1.0 Barmenu.qml
+Battery 1.0 Battery.qml
+Bluetooth 1.0 Bluetooth.qml
+Bluetoothmenu 1.0 Bluetoothmenu.qml
+BluetoothWidget 1.0 BluetoothWidget.qml
+Bmslider 1.0 Bmslider.qml
+Calendarmenu 1.0 Calendarmenu.qml
+Clock 1.0 Clock.qml
+Controlcenter 1.0 Controlcenter.qml
+Keybinds 1.0 Keybinds.qml
+Networking 1.0 Networking.qml
+OsdWindow 1.0 OsdWindow.qml
+Power 1.0 Power.qml
+Powermenu 1.0 Powermenu.qml
+Profile 1.0 Profile.qml
+Profilemenu 1.0 Profilemenu.qml
+Settings 1.0 Settings.qml
+System 1.0 System.qml
+Themeengine 1.0 Themeengine.qml
+Thememenu 1.0 Thememenu.qml
+User 1.0 User.qml
+Wallpaper 1.0 Wallpaper.qml
+Wallpapermenu 1.0 Wallpapermenu.qml
+Wifi 1.0 Wifi.qml
+Wifimenu 1.0 Wifimenu.qml
+Workspaces 1.0 Workspaces.qml

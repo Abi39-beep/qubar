@@ -151,15 +151,7 @@ Item {
         let script = `
                 THEME_DIR="${home}/.config/quickshell/themes/${themeName}"
 
-                # --- 1. RANDOM WALLPAPER FIRST ---
-                WALL=$(find "$THEME_DIR" -maxdepth 1 -type f \\( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \\) 2>/dev/null | shuf -n 1)
-                if [ -n "$WALL" ]; then
-                    printf "%s\\n" "$WALL" > "${home}/.cache/current_wallpaper"
-                fi
-
-                echo "${themeName}" > "${home}/.cache/current_theme"
-
-                # --- 2. STANDARD CONFIGS ---
+                # 1. Standard configs
                 cp "$THEME_DIR/kitty/"*.conf "${home}/.config/kitty/color.conf" 2>/dev/null || true
                 cp "$THEME_DIR/foot/"*.ini "${home}/.config/foot/color.ini" 2>/dev/null || true
                 cp "$THEME_DIR/hyprlock/"*.conf "${home}/.config/hypr/color.conf" 2>/dev/null || true
@@ -167,9 +159,6 @@ Item {
                 cp "$THEME_DIR/hyprland/"*.lua "${home}/.config/hypr/Colors.lua" 2>/dev/null || true
                 cp "$THEME_DIR/quickshell/Colors.qml" "${home}/.config/quickshell/new/Colors.qml" 2>/dev/null || true
                 cp "$THEME_DIR/quickshell/Colors.qml" "${home}/.config/quickshell/tact/Colors.qml" 2>/dev/null || true
-                cp "$THEME_DIR/quickshell/Colors.qml" "${home}/.config/quickshell/qubar/Colors.qml" 2>/dev/null || true
-                cp "$THEME_DIR/quickshell/Colors.qml" "${home}/.config/quickshell/wallpaper/Colors.qml" 2>/dev/null || true
-                cp "$THEME_DIR/quickshell/Colors.qml" "${home}/.config/quickshell/syslock/Colors.qml" 2>/dev/null || true
 
                 # --- ZEN BROWSER FIX ---
                 pkill -x zen || true
@@ -178,15 +167,22 @@ Item {
                 cp "$THEME_DIR/zen/"*.css "$ZEN_CHROME_DIR/userChrome.css" 2>/dev/null || true
 
                 # --- KITTY LIVE RELOAD FIX ---
+                # Sending SIGUSR1 forces Kitty to naturally reload its config file instantly!
                 killall -SIGUSR1 kitty 2>/dev/null || true
 
-                # --- 3. FORCE RESTART QUICKSHELL (UI ONLY) ---
-                # Wait 0.2 seconds to ensure cache files are fully written to disk
-                sleep 0.2
+                echo "${themeName}" > "${home}/.cache/current_theme"
+
+                # 3. Random Wallpaper
+                WALL=$(find "$THEME_DIR" -maxdepth 1 -type f \\( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" \\) 2>/dev/null | shuf -n 1)
+                if [ -n "$WALL" ]; then
+                    echo "$WALL" > "${home}/.cache/current_wallpaper"
+                fi
+
+                # Force Restart Quickshell
                 if [ -f "${home}/.config/quickshell/reload.sh" ]; then
                     bash "${home}/.config/quickshell/reload.sh" &
                 else
-                    pkill -f "^quickshell$" && quickshell &
+                    killall quickshell && quickshell &
                 fi
             `;
 

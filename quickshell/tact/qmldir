@@ -22,3 +22,6 @@ WallpaperMenu 1.0 WallpaperMenu.qml
 Wifi 1.0 Wifi.qml
 WifiMenu 1.0 WifiMenu.qml
 BarMenu 1.0 BarMenu.qml
+ThemeEngine 1.0 ThemeEngine.qml
+Wallpaper 1.0 Wallpaper.qml
+WallpaperBg 1.0 WallpaperBg.qml
