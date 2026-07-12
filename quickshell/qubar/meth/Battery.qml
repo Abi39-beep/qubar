@@ -1,56 +1,99 @@
-import QtQuick
 import Quickshell.Services.UPower
+import QtQuick
+import QtQuick.Layouts
 import ".."
 
-Rectangle {
-    id: batteryWidget
-    width: 40
-    height: 20
-    radius: 11
-    color: Colors.grey0
-    anchors.verticalCenter: parent.verticalCenter
-    property string activeProfile: ""
-    readonly property int batPercent: UPower.displayDevice?.ready ? Math.round(UPower.displayDevice.percentage * 100) : 0
-    readonly property bool isCharging: !UPower.onBattery
-    Rectangle {
-        id: fillBar
-        anchors.left: parent.left
-        anchors.verticalCenter: parent.verticalCenter
-        width: (batteryWidget.batPercent / 100) * (parent.width - 4)
-        height: parent.height - 4
-        radius: 9
-        color: Colors.green
-        anchors.leftMargin: 2
-        Behavior on width {
-            NumberAnimation {
-                duration: 300
+RowLayout {
+    id: root
+    spacing: 6
+
+signal openProfileMenu()
+
+    property var battery: UPower.displayDevice
+    property bool charging: battery ? battery.state === UPowerDeviceState.Charging : false
+    readonly property int level: battery ? Math.round(battery.percentage * 100) : 0
+
+    property color indicatorColor: root.charging ? Colors.green : (root.level <= 15 ? Colors.red : (root.level <= 30 ? Colors.orange : Colors.green))
+
+    Item {
+        Layout.preferredWidth: 41
+        Layout.preferredHeight: 16
+        Layout.alignment: Qt.AlignVCenter
+
+        Rectangle {
+            id: batteryBody
+            width: 38
+            height: 16
+            radius: 3
+            anchors.verticalCenter: parent.verticalCenter
+            color: "transparent"
+            border.width: 1
+            border.color: root.indicatorColor
+
+            Behavior on border.color { ColorAnimation { duration: 150 } }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.margins: 2
+
+                width: (root.level / 100) * 34
+                radius: 1
+                color: root.indicatorColor
+
+                Behavior on width {
+                    NumberAnimation {
+                        duration: 300
+                        easing.type: Easing.OutExpo
+                    }
+                }
+                Behavior on color { ColorAnimation { duration: 150 } }
+            }
+
+            Row {
+                anchors.centerIn: parent
+                spacing: 1
+
+                Text {
+                    visible: root.charging
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "󱐋"
+                    color: Colors.bg0
+                    font.pixelSize: 10
+                    font.family: "JetBrainsMono Nerd Font Propo"
+                    font.bold: true
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.level
+                    color: Colors.bg0
+                    font {
+                        family: "SF Mono"
+                        weight: 800
+                        pixelSize: 10
+                    }
+                }
             }
         }
-    }
-    Row {
-        anchors.centerIn: parent
-        spacing: 1
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: batteryWidget.isCharging
-            text: "󱐋"
-            color: Colors.bg0
-            font {
-                pixelSize: 12
-                family: "JetBrainsMono Nerd Font Propo"
-                bold: true
-            }
+
+        Rectangle {
+            anchors.left: batteryBody.right
+            anchors.leftMargin: 1
+            anchors.verticalCenter: batteryBody.verticalCenter
+            width: 2
+            height: 6
+            radius: 1
+            color: root.indicatorColor
+
+            Behavior on color { ColorAnimation { duration: 150 } }
         }
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: batteryWidget.batPercent
-            color: Colors.bg0
-            font {
-                pixelSize: 12
-                family: "JetBrainsMono Nerd Font Propo"
-                bold: true
-                letterSpacing: -0.5
-            }
+
+        MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.openProfileMenu()
         }
     }
 }

@@ -62,9 +62,8 @@ PanelWindow {
         }
 
         anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.topMargin: 46
-        anchors.rightMargin: 10
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.topMargin: 55
 
         width: currentView === "main" ? 420 : 400
         height: (currentView === "main" ? mainColumn.height : (currentView === "wifi" ? wifiMenuView.height : (currentView === "bluetooth" ? btMenuView.height : (currentView === "profile" ? profileMenuView.height : (currentView === "settings" ? settingsMenuView.height : (currentView === "theme" ? themeMenuView.height : (currentView === "wallpaper" ? wallMenuView.height : (currentView === "bar" ? barMenuView.height : (currentView === "calendar" ? calMenuView.height : powerMenuView.height))))))))) + 40
@@ -75,7 +74,7 @@ PanelWindow {
         border.width: 2
         clip: true
 
-        transformOrigin: Item.TopRight
+        transformOrigin: Item.Top
         scale: ccRoot.visible ? 1.0 : 0.8
         opacity: ccRoot.visible ? 1.0 : 0.0
 
